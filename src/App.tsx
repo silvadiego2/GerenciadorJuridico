@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Processes from './pages/Processes';
 import Tasks from './pages/Tasks';
+import Users from './pages/Users';
+import Integrations from './pages/Integrations';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +36,7 @@ function App() {
               <Route path="clientes" element={<Clients />} />
               <Route path="processos" element={<Processes />} />
               <Route path="tarefas" element={<Tasks />} />
+              <Route path="integracoes" element={<Integrations />} />
               <Route path="documentos" element={
                 <div className="p-6">
                   <h1 className="text-2xl font-bold text-gray-900">Documentos</h1>
@@ -64,6 +67,11 @@ function App() {
                     <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
                     <p className="text-gray-600 mt-2">Módulo em desenvolvimento...</p>
                   </div>
+                </ProtectedRoute>
+              } />
+              <Route path="usuarios" element={
+                <ProtectedRoute requiredRoles={['admin']}>
+                  <Users />
                 </ProtectedRoute>
               } />
             </Route>

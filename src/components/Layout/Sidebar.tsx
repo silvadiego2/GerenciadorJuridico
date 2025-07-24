@@ -11,7 +11,9 @@ import {
   Settings,
   Scale,
   Bell,
-  LogOut
+  LogOut,
+  Link,
+  UserPlus
 } from 'lucide-react';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { clsx } from 'clsx';
@@ -32,9 +34,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
     { name: 'Financeiro', href: '/financeiro', icon: DollarSign },
     { name: 'Publicações', href: '/publicacoes', icon: BookOpen },
     { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },
+    { name: 'Integrações', href: '/integracoes', icon: Link },
   ];
 
   const adminNavigation = [
+    { name: 'Usuários', href: '/usuarios', icon: UserPlus },
     { name: 'Configurações', href: '/configuracoes', icon: Settings },
   ];
 

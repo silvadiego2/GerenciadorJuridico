@@ -1,0 +1,219 @@
+import { Client, Process, Task, Financial, Publication, Dashboard, ProcessMovement, Document } from '../types';
+
+export const mockClients: Client[] = [
+  {
+    id: '1',
+    name: 'João da Silva Santos',
+    email: 'joao.santos@email.com',
+    phone: '(71) 99999-1234',
+    document: '123.456.789-00',
+    type: 'fisica',
+    status: 'ativo',
+    address: {
+      street: 'Rua das Flores',
+      number: '123',
+      neighborhood: 'Centro',
+      city: 'Salvador',
+      state: 'BA',
+      zipCode: '40000-000',
+    },
+    createdAt: new Date('2024-01-15'),
+    updatedAt: new Date('2024-01-15'),
+  },
+  {
+    id: '2',
+    name: 'Empresa ABC Ltda',
+    email: 'contato@empresaabc.com',
+    phone: '(71) 3333-4444',
+    document: '12.345.678/0001-90',
+    type: 'juridica',
+    status: 'ativo',
+    address: {
+      street: 'Av. Tancredo Neves',
+      number: '2227',
+      complement: 'Sala 1001',
+      neighborhood: 'Caminho das Árvores',
+      city: 'Salvador',
+      state: 'BA',
+      zipCode: '41820-021',
+    },
+    createdAt: new Date('2024-02-01'),
+    updatedAt: new Date('2024-02-01'),
+  },
+];
+
+export const mockMovements: ProcessMovement[] = [
+  {
+    id: '1',
+    processId: '1',
+    date: new Date('2024-12-10'),
+    description: 'Juntada de petição inicial',
+    type: 'andamento',
+    read: false,
+  },
+  {
+    id: '2',
+    processId: '1',
+    date: new Date('2024-12-08'),
+    description: 'Citação expedida para o réu',
+    type: 'citacao',
+    read: true,
+  },
+];
+
+export const mockDocuments: Document[] = [
+  {
+    id: '1',
+    name: 'Petição Inicial.pdf',
+    type: 'application/pdf',
+    size: 1024000,
+    url: '/documents/peticao-inicial.pdf',
+    processId: '1',
+    uploadedBy: '1',
+    createdAt: new Date('2024-12-01'),
+  },
+];
+
+export const mockProcesses: Process[] = [
+  {
+    id: '1',
+    number: '1001234-56.2024.8.05.0001',
+    cnj: '1001234-56.2024.8.05.0001',
+    clientId: '1',
+    client: mockClients[0],
+    subject: 'Ação de Cobrança',
+    class: 'Procedimento Comum',
+    court: '1ª Vara Cível de Salvador',
+    comarca: 'Salvador',
+    phase: 'Conhecimento',
+    status: 'ativo',
+    value: 50000,
+    createdAt: new Date('2024-12-01'),
+    updatedAt: new Date('2024-12-10'),
+    movements: mockMovements,
+    tasks: [],
+    documents: mockDocuments,
+  },
+  {
+    id: '2',
+    number: '2002345-67.2024.8.05.0002',
+    cnj: '2002345-67.2024.8.05.0002',
+    clientId: '2',
+    client: mockClients[1],
+    subject: 'Ação Trabalhista',
+    class: 'Rito Ordinário',
+    court: '3ª Vara do Trabalho de Salvador',
+    comarca: 'Salvador',
+    phase: 'Execução',
+    status: 'ativo',
+    value: 75000,
+    createdAt: new Date('2024-11-15'),
+    updatedAt: new Date('2024-12-05'),
+    movements: [],
+    tasks: [],
+    documents: [],
+  },
+];
+
+export const mockTasks: Task[] = [
+  {
+    id: '1',
+    title: 'Apresentar contestação',
+    description: 'Prazo para contestação vence em 15 dias',
+    processId: '1',
+    assignedTo: '1',
+    priority: 'alta',
+    status: 'pendente',
+    dueDate: new Date('2024-12-25'),
+    createdAt: new Date('2024-12-10'),
+    updatedAt: new Date('2024-12-10'),
+  },
+  {
+    id: '2',
+    title: 'Agendar audiência',
+    description: 'Entrar em contato com o cliente para agendar horário',
+    processId: '2',
+    assignedTo: '2',
+    priority: 'media',
+    status: 'em_andamento',
+    dueDate: new Date('2024-12-20'),
+    createdAt: new Date('2024-12-08'),
+    updatedAt: new Date('2024-12-09'),
+  },
+];
+
+export const mockFinancial: Financial[] = [
+  {
+    id: '1',
+    type: 'honorario',
+    description: 'Honorários contratuais - Ação de Cobrança',
+    value: 15000,
+    status: 'pago',
+    dueDate: new Date('2024-12-01'),
+    paidAt: new Date('2024-12-01'),
+    processId: '1',
+    clientId: '1',
+    createdAt: new Date('2024-12-01'),
+  },
+  {
+    id: '2',
+    type: 'despesa',
+    description: 'Custas processuais',
+    value: 500,
+    status: 'pendente',
+    dueDate: new Date('2024-12-30'),
+    processId: '1',
+    clientId: '1',
+    createdAt: new Date('2024-12-10'),
+  },
+];
+
+export const mockPublications: Publication[] = [
+  {
+    id: '1',
+    date: new Date('2024-12-10'),
+    content: 'Intimação para apresentação de documentos no prazo de 10 dias',
+    source: 'dje',
+    processId: '1',
+    read: false,
+    acknowledged: false,
+  },
+  {
+    id: '2',
+    date: new Date('2024-12-08'),
+    content: 'Despacho determinando citação do réu',
+    source: 'dje',
+    processId: '1',
+    read: true,
+    acknowledged: true,
+  },
+];
+
+export const mockDashboard: Dashboard = {
+  totalProcesses: 150,
+  activeProcesses: 120,
+  overdueTasks: 8,
+  pendingPublications: 12,
+  monthlyRevenue: 85000,
+  clientsCount: 89,
+  processesByStatus: [
+    { status: 'Ativo', count: 120 },
+    { status: 'Suspenso', count: 15 },
+    { status: 'Arquivado', count: 12 },
+    { status: 'Baixado', count: 3 },
+  ],
+  tasksByPriority: [
+    { priority: 'Urgente', count: 5 },
+    { priority: 'Alta', count: 18 },
+    { priority: 'Média', count: 32 },
+    { priority: 'Baixa', count: 12 },
+  ],
+  revenueByMonth: [
+    { month: 'Jan', value: 75000 },
+    { month: 'Fev', value: 82000 },
+    { month: 'Mar', value: 78000 },
+    { month: 'Abr', value: 85000 },
+    { month: 'Mai', value: 92000 },
+    { month: 'Jun', value: 88000 },
+  ],
+};

@@ -11,6 +11,11 @@ import Processes from './pages/Processes';
 import Tasks from './pages/Tasks';
 import Users from './pages/Users';
 import Integrations from './pages/Integrations';
+import Documents from './pages/Documents';
+import Financial from './pages/Financial';
+import Publications from './pages/Publications';
+import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,36 +42,13 @@ function App() {
               <Route path="processos" element={<Processes />} />
               <Route path="tarefas" element={<Tasks />} />
               <Route path="integracoes" element={<Integrations />} />
-              <Route path="documentos" element={
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold text-gray-900">Documentos</h1>
-                  <p className="text-gray-600 mt-2">Módulo em desenvolvimento...</p>
-                </div>
-              } />
-              <Route path="financeiro" element={
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
-                  <p className="text-gray-600 mt-2">Módulo em desenvolvimento...</p>
-                </div>
-              } />
-              <Route path="publicacoes" element={
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold text-gray-900">Publicações</h1>
-                  <p className="text-gray-600 mt-2">Módulo em desenvolvimento...</p>
-                </div>
-              } />
-              <Route path="relatorios" element={
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
-                  <p className="text-gray-600 mt-2">Módulo em desenvolvimento...</p>
-                </div>
-              } />
+              <Route path="documentos" element={<Documents />} />
+              <Route path="financeiro" element={<Financial />} />
+              <Route path="publicacoes" element={<Publications />} />
+              <Route path="relatorios" element={<Reports />} />
               <Route path="configuracoes" element={
                 <ProtectedRoute requiredRoles={['admin']}>
-                  <div className="p-6">
-                    <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-                    <p className="text-gray-600 mt-2">Módulo em desenvolvimento...</p>
-                  </div>
+                  <Settings />
                 </ProtectedRoute>
               } />
               <Route path="usuarios" element={

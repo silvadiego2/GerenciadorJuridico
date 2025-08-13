@@ -23,7 +23,7 @@ export interface Client {
   updatedAt: Date;
 }
 
-export interface Address {
+interface Address {
   street: string;
   number: string;
   complement?: string;

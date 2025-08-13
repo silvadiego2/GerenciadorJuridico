@@ -1,5 +1,5 @@
 // Serviço para integração SOAP com PJe
-export interface PJEConfig {
+interface PJEConfig {
   wsdlUrl: string;
   usuario: string;
   senha: string;
@@ -50,7 +50,7 @@ export interface PJEProcessSOAP {
   }>;
 }
 
-export interface PJESearchParamsSOAP {
+interface PJESearchParamsSOAP {
   numeroProcesso?: string;
   numeroOAB?: string;
   cpfCnpj?: string;

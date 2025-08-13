@@ -19,7 +19,7 @@ export interface TJBAMeta {
   status: 'cumprida' | 'nao_cumprida' | 'em_andamento';
 }
 
-export interface TJBAComarca {
+interface TJBAComarca {
   codigo: string;
   nome: string;
   regiao: string;

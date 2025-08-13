@@ -36,7 +36,7 @@ export interface DataJudProcess {
   };
 }
 
-export interface DataJudMovement {
+interface DataJudMovement {
   codigo: number;
   nome: string;
   dataHora: string;
@@ -48,7 +48,7 @@ export interface DataJudMovement {
   complemento?: string;
 }
 
-export interface DataJudSearchParams {
+interface DataJudSearchParams {
   numeroProcesso?: string;
   tribunal: string;
   apiKey: string;

@@ -42,7 +42,7 @@ export const mockClients: Client[] = [
   },
 ];
 
-export const mockMovements: ProcessMovement[] = [
+const mockMovements: ProcessMovement[] = [
   {
     id: '1',
     processId: '1',
@@ -61,7 +61,7 @@ export const mockMovements: ProcessMovement[] = [
   },
 ];
 
-export const mockDocuments: Document[] = [
+const mockDocuments: Document[] = [
   {
     id: '1',
     name: 'Petição Inicial.pdf',
@@ -142,7 +142,7 @@ export const mockTasks: Task[] = [
   },
 ];
 
-export const mockFinancial: Financial[] = [
+const mockFinancial: Financial[] = [
   {
     id: '1',
     type: 'honorario',
@@ -168,7 +168,7 @@ export const mockFinancial: Financial[] = [
   },
 ];
 
-export const mockPublications: Publication[] = [
+const mockPublications: Publication[] = [
   {
     id: '1',
     date: new Date('2024-12-10'),

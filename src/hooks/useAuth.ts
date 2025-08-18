@@ -7,18 +7,39 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
+    const initAuth = async () => {
+      try {
+        // Primeiro tenta pegar do localStorage
+        const currentUser = authService.getCurrentUser();
+        
+        if (currentUser) {
+          // Verifica se o token ainda é válido
+          const verifiedUser = await authService.verifyToken();
+          setUser(verifiedUser);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Erro na inicialização da autenticação:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
+      setLoading(true);
       const user = await authService.login(email, password);
       setUser(user);
       return user;
     } catch (error) {
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -13,17 +13,17 @@ export interface User {
 export interface Client {
   id: string;
   name: string;
-  email: string;
-  phone: string;
-  document: string; // CPF/CNPJ
+  email?: string;
+  phone?: string;
+  document?: string; // CPF/CNPJ
   type: 'fisica' | 'juridica';
-  address: Address;
+  address?: Address;
   status: 'ativo' | 'inativo';
   createdAt: Date;
   updatedAt: Date;
 }
 
-interface Address {
+export interface Address {
   street: string;
   number: string;
   complement?: string;

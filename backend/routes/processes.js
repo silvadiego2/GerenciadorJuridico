@@ -164,3 +164,30 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+
+// DELETE /api/processes/:id - Deletar processo
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('processes')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      message: 'Processo deletado com sucesso'
+    });
+  } catch (error) {
+    console.error('Erro ao deletar processo:', error);
+    res.status(500).json({
+      error: 'Erro ao deletar processo'
+    });
+  }
+});
+
+module.exports = router;

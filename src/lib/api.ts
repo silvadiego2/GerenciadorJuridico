@@ -108,6 +108,9 @@ export const processesService = {
   
   update: (id: string, data: any) => 
     apiClient.put(`/api/processes/${id}`, data),
+  
+  delete: (id: string) => 
+    apiClient.delete(`/api/processes/${id}`),
 };
 
 export const tasksService = {

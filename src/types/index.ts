@@ -37,7 +37,8 @@ export interface Process {
   id: string;
   number: string;
   cnj: string;
-  clientId: string;
+  clientId?: string;
+  client_id?: string;
   client: Client;
   subject: string;
   class: string;

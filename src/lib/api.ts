@@ -122,6 +122,9 @@ export const tasksService = {
   
   update: (id: string, data: any) => 
     apiClient.put(`/api/tasks/${id}`, data),
+  
+  delete: (id: string) => 
+    apiClient.delete(`/api/tasks/${id}`),
 };
 
 export const documentsService = {

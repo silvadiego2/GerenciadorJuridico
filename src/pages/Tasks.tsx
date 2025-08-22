@@ -1,23 +1,121 @@
 import React, { useState } from 'react';
-import { Plus, Search, CheckSquare, Clock, AlertTriangle, User } from 'lucide-react';
-import { mockTasks } from '../lib/mock-data';
+import { Plus, Search, CheckSquare, Clock, AlertTriangle, User, Edit, Trash2, Loader2, Calendar } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { tasksService } from '../lib/api';
 import { Task } from '../types';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import TaskModal from '../components/Tasks/TaskModal';
+import { useNotifications } from '../hooks/useNotifications';
+import { useDebounce } from '../hooks/useDebounce';
 
 const Tasks: React.FC = () => {
-  const [tasks] = useState<Task[]>(mockTasks);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'pendente' | 'em_andamento' | 'concluida' | 'cancelada'>('all');
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'baixa' | 'media' | 'alta' | 'urgente'>('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  
+  const queryClient = useQueryClient();
+  const { success, error } = useNotifications();
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = selectedStatus === 'all' || task.status === selectedStatus;
-    const matchesPriority = selectedPriority === 'all' || task.priority === selectedPriority;
-    return matchesSearch && matchesStatus && matchesPriority;
+  // Query para buscar tarefas
+  const { data: tasksData, isLoading, error: queryError } = useQuery({
+    queryKey: ['tasks', debouncedSearchTerm, selectedStatus, selectedPriority],
+    queryFn: () => tasksService.getAll({
+      search: debouncedSearchTerm || undefined,
+      status: selectedStatus !== 'all' ? selectedStatus : undefined,
+      priority: selectedPriority !== 'all' ? selectedPriority : undefined,
+    }),
+    staleTime: 5 * 60 * 1000, // 5 minutos
   });
+
+  const tasks = tasksData?.tasks || [];
+
+  // Mutation para criar tarefa
+  const createTaskMutation = useMutation({
+    mutationFn: tasksService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      success('Sucesso', 'Tarefa criada com sucesso!');
+      setIsModalOpen(false);
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao criar tarefa');
+    },
+  });
+
+  // Mutation para atualizar tarefa
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Task> }) =>
+      tasksService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      success('Sucesso', 'Tarefa atualizada com sucesso!');
+      setIsModalOpen(false);
+      setEditingTask(null);
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao atualizar tarefa');
+    },
+  });
+
+  // Mutation para deletar tarefa
+  const deleteTaskMutation = useMutation({
+    mutationFn: tasksService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      success('Sucesso', 'Tarefa excluída com sucesso!');
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao excluir tarefa');
+    },
+  });
+
+  // Mutation para concluir tarefa
+  const completeTaskMutation = useMutation({
+    mutationFn: (taskId: string) => 
+      tasksService.update(taskId, { 
+        status: 'concluida',
+        completed_at: new Date().toISOString()
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      success('Sucesso', 'Tarefa concluída!');
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao concluir tarefa');
+    },
+  });
+
+  const handleCreateTask = () => {
+    setEditingTask(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteTask = (taskId: string, taskTitle: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir a tarefa "${taskTitle}"?`)) {
+      deleteTaskMutation.mutate(taskId);
+    }
+  };
+
+  const handleCompleteTask = (taskId: string) => {
+    completeTaskMutation.mutate(taskId);
+  };
+
+  const handleSaveTask = (taskData: Partial<Task>) => {
+    if (editingTask) {
+      updateTaskMutation.mutate({ id: editingTask.id, data: taskData });
+    } else {
+      createTaskMutation.mutate(taskData);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -51,7 +149,7 @@ const Tasks: React.FC = () => {
 
   const getTaskUrgency = (task: Task) => {
     const now = new Date();
-    const dueDate = task.dueDate;
+    const dueDate = new Date(task.dueDate);
     
     if (isBefore(dueDate, now)) {
       return { type: 'overdue', label: 'Vencida', color: 'text-red-600' };
@@ -62,6 +160,16 @@ const Tasks: React.FC = () => {
     }
   };
 
+  if (queryError) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">Erro ao carregar tarefas: {(queryError as Error).message}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -69,7 +177,10 @@ const Tasks: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Tarefas</h1>
           <p className="text-gray-600">Gerencie suas tarefas e prazos</p>
         </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+        <button 
+          onClick={handleCreateTask}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+        >
           <Plus className="h-4 w-4" />
           <span>Nova Tarefa</span>
         </button>
@@ -116,92 +227,158 @@ const Tasks: React.FC = () => {
       {/* Lista de Tarefas */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {filteredTasks.length} tarefa{filteredTasks.length !== 1 ? 's' : ''} encontrada{filteredTasks.length !== 1 ? 's' : ''}
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {isLoading ? 'Carregando...' : `${tasks.length} tarefa${tasks.length !== 1 ? 's' : ''} encontrada${tasks.length !== 1 ? 's' : ''}`}
+            </h2>
+            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+          </div>
         </div>
         
-        <div className="divide-y divide-gray-200">
-          {filteredTasks.map((task) => {
-            const urgency = getTaskUrgency(task);
-            return (
-              <div key={task.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-4 flex-1">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <CheckSquare className="h-6 w-6 text-blue-600" />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {task.title}
-                        </h3>
-                        <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(task.status)}`}>
-                          {task.status.replace('_', ' ').charAt(0).toUpperCase() + task.status.replace('_', ' ').slice(1)}
-                        </span>
-                        <span className={`px-2 py-1 rounded-md border text-xs ${getPriorityColor(task.priority)}`}>
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                        </span>
+        {isLoading ? (
+          <div className="p-12 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-500">Carregando tarefas...</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {tasks.map((task) => {
+              const urgency = getTaskUrgency(task);
+              return (
+                <div key={task.id} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4 flex-1">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <CheckSquare className="h-6 w-6 text-blue-600" />
                       </div>
                       
-                      {task.description && (
-                        <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-                      )}
-                      
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4" />
-                          <span>Vence em {format(task.dueDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
-                          <span className={`ml-2 font-medium ${urgency.color}`}>
-                            ({urgency.label})
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {task.title}
+                          </h3>
+                          <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(task.status)}`}>
+                            {task.status.replace('_', ' ').charAt(0).toUpperCase() + task.status.replace('_', ' ').slice(1)}
+                          </span>
+                          <span className={`px-2 py-1 rounded-md border text-xs ${getPriorityColor(task.priority)}`}>
+                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                           </span>
                         </div>
-                      </div>
-                      
-                      {task.processId && (
-                        <div className="mt-2 text-sm text-gray-600">
-                          <strong>Processo:</strong> Vinculada ao processo
+                        
+                        {task.description && (
+                          <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                        )}
+                        
+                        <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+                          <div className="flex items-center space-x-1">
+                            <Clock className="h-4 w-4" />
+                            <span>Vence em {format(new Date(task.dueDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                            <span className={`ml-2 font-medium ${urgency.color}`}>
+                              ({urgency.label})
+                            </span>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4 ml-4">
-                    <div className="text-right text-sm text-gray-600 hidden sm:block">
-                      <div className="flex items-center space-x-1">
-                        <User className="h-4 w-4" />
-                        <span>Responsável</span>
+                        
+                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          {task.assigned_user && (
+                            <div className="flex items-center space-x-1">
+                              <User className="h-4 w-4" />
+                              <span>{task.assigned_user.name}</span>
+                            </div>
+                          )}
+                          
+                          {task.process && (
+                            <div className="flex items-center space-x-1">
+                              <span className="font-medium">Processo:</span>
+                              <span className="font-mono text-xs">{task.process.number}</span>
+                            </div>
+                          )}
+                          
+                          {task.client && (
+                            <div className="flex items-center space-x-1">
+                              <span className="font-medium">Cliente:</span>
+                              <span>{task.client.name}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <p className="font-medium">Dr. João Silva</p>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
-                      {task.status !== 'concluida' && (
-                        <button className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors">
-                          Concluir
+                    <div className="flex items-center space-x-2 ml-4">
+                      {task.status !== 'concluida' && task.status !== 'cancelada' && (
+                        <button 
+                          onClick={() => handleCompleteTask(task.id)}
+                          disabled={completeTaskMutation.isPending}
+                          className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 disabled:opacity-50 transition-colors"
+                        >
+                          {completeTaskMutation.isPending ? 'Concluindo...' : 'Concluir'}
                         </button>
                       )}
-                      <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                        <Clock className="h-4 w-4" />
+                      <button 
+                        onClick={() => handleEditTask(task)}
+                        className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteTask(task.id, task.title)}
+                        disabled={deleteTaskMutation.isPending}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {deleteTaskMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </div>
+                  
+                  {/* Informações Adicionais */}
+                  <div className="mt-4 text-sm text-gray-600">
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        Criada em {format(new Date(task.createdAt), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      </span>
+                      {task.completedAt && (
+                        <>
+                          <span>•</span>
+                          <span>
+                            Concluída em {format(new Date(task.completedAt), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
+            
+            {tasks.length === 0 && (
+              <div className="p-12 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckSquare className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500">Nenhuma tarefa encontrada com os filtros aplicados</p>
               </div>
-            );
-          })}
-          
-          {filteredTasks.length === 0 && (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckSquare className="h-8 w-8 text-gray-400" />
-              </div>
-              <p className="text-gray-500">Nenhuma tarefa encontrada com os filtros aplicados</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Modal de Tarefa */}
+      {isModalOpen && (
+        <TaskModal
+          task={editingTask}
+          onSave={handleSaveTask}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingTask(null);
+          }}
+          isLoading={createTaskMutation.isPending || updateTaskMutation.isPending}
+        />
+      )}
     </div>
   );
 };

@@ -146,4 +146,29 @@ router.put('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/tasks/:id - Deletar tarefa
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      message: 'Tarefa deletada com sucesso'
+    });
+  } catch (error) {
+    console.error('Erro ao deletar tarefa:', error);
+    res.status(500).json({
+      error: 'Erro ao deletar tarefa'
+    });
+  }
+});
+
 module.exports = router;

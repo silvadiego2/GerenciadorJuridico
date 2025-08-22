@@ -76,6 +76,20 @@ export interface Task {
   completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  // Relacionamentos vindos do backend
+  process?: {
+    id: string;
+    number: string;
+    subject: string;
+  };
+  client?: {
+    id: string;
+    name: string;
+  };
+  assigned_user?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface Document {

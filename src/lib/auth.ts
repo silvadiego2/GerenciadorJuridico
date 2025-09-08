@@ -33,6 +33,31 @@ export const authService = {
     }
   },
 
+  register: async (userData: { name: string; email: string; password: string; role: string; oab?: string; phone?: string }): Promise<User> => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao criar usuário');
+      }
+
+      const { user, token } = await response.json();
+      
+      // Não armazenar token/dados do usuário criado, apenas retornar
+      return user;
+    } catch (error) {
+      console.error('Erro no registro:', error);
+      throw error;
+    }
+  },
+
   logout: () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);

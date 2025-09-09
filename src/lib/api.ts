@@ -150,6 +150,9 @@ export const financialService = {
   
   update: (id: string, data: any) => 
     apiClient.put(`/api/financial/${id}`, data),
+  
+  delete: (id: string) => 
+    apiClient.delete(`/api/financial/${id}`),
 };
 
 export const publicationsService = {

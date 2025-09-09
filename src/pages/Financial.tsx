@@ -2,33 +2,16 @@ import React, { useState } from 'react';
 import { 
   Plus, Search, DollarSign, TrendingUp, TrendingDown, 
   Calendar, User, FileText, CreditCard, AlertCircle,
-  CheckCircle, Clock, Filter, Download, Eye
+  CheckCircle, Clock, Filter, Download, Eye, Edit, Trash2, Loader2
 } from 'lucide-react';
-import { format, addDays, isBefore, isAfter } from 'date-fns';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { financialService } from '../lib/api';
+import { Financial } from '../types';
+import { format, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-interface FinancialEntry {
-  id: string;
-  type: 'honorario' | 'despesa' | 'receita' | 'reembolso';
-  category: string;
-  description: string;
-  value: number;
-  status: 'pendente' | 'pago' | 'vencido' | 'cancelado';
-  dueDate: Date;
-  paidAt?: Date;
-  processId?: string;
-  processNumber?: string;
-  clientId: string;
-  clientName: string;
-  responsibleId: string;
-  responsibleName: string;
-  paymentMethod?: 'dinheiro' | 'pix' | 'transferencia' | 'boleto' | 'cartao';
-  installments?: number;
-  currentInstallment?: number;
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import FinancialModal from '../components/Financial/FinancialModal';
+import { useNotifications } from '../hooks/useNotifications';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface FinancialSummary {
   totalReceitas: number;
@@ -36,107 +19,112 @@ interface FinancialSummary {
   saldoLiquido: number;
   honorariosPendentes: number;
   despesasVencidas: number;
-  receitasMes: number;
-  crescimentoMensal: number;
 }
 
 const Financial: React.FC = () => {
-  const [entries] = useState<FinancialEntry[]>([
-    {
-      id: '1',
-      type: 'honorario',
-      category: 'Honorários Contratuais',
-      description: 'Honorários - Ação de Cobrança',
-      value: 15000,
-      status: 'pago',
-      dueDate: new Date('2024-12-01'),
-      paidAt: new Date('2024-12-01'),
-      processId: '1',
-      processNumber: '1001234-56.2024.8.05.0001',
-      clientId: '1',
-      clientName: 'João da Silva Santos',
-      responsibleId: '1',
-      responsibleName: 'Dr. João Silva',
-      paymentMethod: 'transferencia',
-      createdAt: new Date('2024-11-15'),
-      updatedAt: new Date('2024-12-01'),
-    },
-    {
-      id: '2',
-      type: 'despesa',
-      category: 'Custas Processuais',
-      description: 'Custas iniciais - TJ-BA',
-      value: 500,
-      status: 'pendente',
-      dueDate: new Date('2024-12-30'),
-      clientId: '1',
-      clientName: 'João da Silva Santos',
-      responsibleId: '1',
-      responsibleName: 'Dr. João Silva',
-      processId: '1',
-      processNumber: '1001234-56.2024.8.05.0001',
-      createdAt: new Date('2024-12-10'),
-      updatedAt: new Date('2024-12-10'),
-    },
-    {
-      id: '3',
-      type: 'honorario',
-      category: 'Honorários Êxito',
-      description: 'Honorários de êxito - 20%',
-      value: 25000,
-      status: 'pendente',
-      dueDate: new Date('2024-12-25'),
-      clientId: '2',
-      clientName: 'Empresa ABC Ltda',
-      responsibleId: '2',
-      responsibleName: 'Maria Santos',
-      installments: 3,
-      currentInstallment: 1,
-      createdAt: new Date('2024-12-05'),
-      updatedAt: new Date('2024-12-05'),
-    },
-    {
-      id: '4',
-      type: 'despesa',
-      category: 'Despesas Operacionais',
-      description: 'Diligências e deslocamentos',
-      value: 300,
-      status: 'vencido',
-      dueDate: new Date('2024-12-05'),
-      clientId: '1',
-      clientName: 'João da Silva Santos',
-      responsibleId: '1',
-      responsibleName: 'Dr. João Silva',
-      createdAt: new Date('2024-11-20'),
-      updatedAt: new Date('2024-11-20'),
-    }
-  ]);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'honorario' | 'despesa' | 'receita' | 'reembolso'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'pendente' | 'pago' | 'vencido' | 'cancelado'>('all');
-  const [dateRange, setDateRange] = useState<'all' | 'month' | 'quarter' | 'year'>('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<Financial | null>(null);
+  
+  const queryClient = useQueryClient();
+  const { success, error } = useNotifications();
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // Calcular resumo financeiro
-  const summary: FinancialSummary = {
-    totalReceitas: entries.filter(e => e.type === 'honorario' && e.status === 'pago').reduce((sum, e) => sum + e.value, 0),
-    totalDespesas: entries.filter(e => e.type === 'despesa' && e.status === 'pago').reduce((sum, e) => sum + e.value, 0),
-    saldoLiquido: 0,
-    honorariosPendentes: entries.filter(e => e.type === 'honorario' && e.status === 'pendente').reduce((sum, e) => sum + e.value, 0),
-    despesasVencidas: entries.filter(e => e.type === 'despesa' && e.status === 'vencido').reduce((sum, e) => sum + e.value, 0),
-    receitasMes: 85000,
-    crescimentoMensal: 12.5
-  };
-  summary.saldoLiquido = summary.totalReceitas - summary.totalDespesas;
-
-  const filteredEntries = entries.filter(entry => {
-    const matchesSearch = entry.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         entry.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (entry.processNumber && entry.processNumber.includes(searchTerm));
-    const matchesType = selectedType === 'all' || entry.type === selectedType;
-    const matchesStatus = selectedStatus === 'all' || entry.status === selectedStatus;
-    return matchesSearch && matchesType && matchesStatus;
+  // Query para buscar entradas financeiras
+  const { data: financialData, isLoading, error: queryError } = useQuery({
+    queryKey: ['financial', debouncedSearchTerm, selectedType, selectedStatus],
+    queryFn: () => financialService.getAll({
+      search: debouncedSearchTerm || undefined,
+      type: selectedType !== 'all' ? selectedType : undefined,
+      status: selectedStatus !== 'all' ? selectedStatus : undefined,
+    }),
+    staleTime: 5 * 60 * 1000, // 5 minutos
   });
+
+  // Query para buscar resumo financeiro
+  const { data: summaryData } = useQuery({
+    queryKey: ['financial-summary'],
+    queryFn: () => financialService.getSummary(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const entries = financialData?.entries || [];
+  const summary: FinancialSummary = summaryData || {
+    totalReceitas: 0,
+    totalDespesas: 0,
+    saldoLiquido: 0,
+    honorariosPendentes: 0,
+    despesasVencidas: 0,
+  };
+
+  // Mutation para criar entrada
+  const createEntryMutation = useMutation({
+    mutationFn: financialService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+      success('Sucesso', 'Entrada financeira criada com sucesso!');
+      setIsModalOpen(false);
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao criar entrada financeira');
+    },
+  });
+
+  // Mutation para atualizar entrada
+  const updateEntryMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Financial> }) =>
+      financialService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+      success('Sucesso', 'Entrada financeira atualizada com sucesso!');
+      setIsModalOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao atualizar entrada financeira');
+    },
+  });
+
+  // Mutation para deletar entrada
+  const deleteEntryMutation = useMutation({
+    mutationFn: financialService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+      success('Sucesso', 'Entrada financeira excluída com sucesso!');
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao excluir entrada financeira');
+    },
+  });
+
+  const handleCreateEntry = () => {
+    setEditingEntry(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditEntry = (entry: Financial) => {
+    setEditingEntry(entry);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteEntry = (entryId: string, entryDescription: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir a entrada "${entryDescription}"?`)) {
+      deleteEntryMutation.mutate(entryId);
+    }
+  };
+
+  const handleSaveEntry = (entryData: Partial<Financial>) => {
+    if (editingEntry) {
+      updateEntryMutation.mutate({ id: editingEntry.id, data: entryData });
+    } else {
+      createEntryMutation.mutate(entryData);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -181,6 +169,16 @@ const Financial: React.FC = () => {
     }
   };
 
+  if (queryError) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">Erro ao carregar dados financeiros: {(queryError as Error).message}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -193,7 +191,10 @@ const Financial: React.FC = () => {
             <Download className="h-4 w-4" />
             <span>Exportar</span>
           </button>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+          <button 
+            onClick={handleCreateEntry}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          >
             <Plus className="h-4 w-4" />
             <span>Nova Entrada</span>
           </button>
@@ -300,106 +301,148 @@ const Financial: React.FC = () => {
       {/* Lista de Entradas Financeiras */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {filteredEntries.length} entrada{filteredEntries.length !== 1 ? 's' : ''} encontrada{filteredEntries.length !== 1 ? 's' : ''}
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {isLoading ? 'Carregando...' : `${entries.length} entrada${entries.length !== 1 ? 's' : ''} encontrada${entries.length !== 1 ? 's' : ''}`}
+            </h2>
+            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+          </div>
         </div>
 
-        <div className="divide-y divide-gray-200">
-          {filteredEntries.map((entry) => {
-            const StatusIcon = getStatusIcon(entry.status);
-            const isOverdue = entry.status === 'pendente' && isBefore(entry.dueDate, new Date());
-            
-            return (
-              <div key={entry.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 flex-1">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                      entry.type === 'honorario' || entry.type === 'receita' ? 'bg-green-100' : 'bg-red-100'
-                    }`}>
-                      <DollarSign className={`h-6 w-6 ${getTypeColor(entry.type)}`} />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {entry.description}
-                        </h3>
-                        <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(entry.status)}`}>
-                          {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
-                        </span>
-                        {isOverdue && (
-                          <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
-                            Vencido
+        {isLoading ? (
+          <div className="p-12 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-500">Carregando dados financeiros...</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {entries.map((entry: any) => {
+              const StatusIcon = getStatusIcon(entry.status);
+              const isOverdue = entry.status === 'pendente' && isBefore(new Date(entry.due_date), new Date());
+              
+              return (
+                <div key={entry.id} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                        entry.type === 'honorario' || entry.type === 'receita' ? 'bg-green-100' : 'bg-red-100'
+                      }`}>
+                        <DollarSign className={`h-6 w-6 ${getTypeColor(entry.type)}`} />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {entry.description}
+                          </h3>
+                          <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(entry.status)}`}>
+                            {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                           </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                        <span className="font-medium">{entry.category}</span>
-                        <span>•</span>
-                        <span>{entry.clientName}</span>
-                        {entry.processNumber && (
-                          <>
-                            <span>•</span>
-                            <span className="font-mono">{entry.processNumber}</span>
-                          </>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>Vence em {format(entry.dueDate, "dd/MM/yyyy", { locale: ptBR })}</span>
+                          {isOverdue && (
+                            <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                              Vencido
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <User className="h-4 w-4" />
-                          <span>{entry.responsibleName}</span>
+                        
+                        <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+                          {entry.category && <span className="font-medium">{entry.category}</span>}
+                          <span>•</span>
+                          <span>{entry.client?.name || 'Cliente não encontrado'}</span>
+                          {entry.process && (
+                            <>
+                              <span>•</span>
+                              <span className="font-mono">{entry.process.number}</span>
+                            </>
+                          )}
                         </div>
-                        {entry.installments && (
-                          <span>Parcela {entry.currentInstallment}/{entry.installments}</span>
-                        )}
+                        
+                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          <div className="flex items-center space-x-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>Vence em {format(new Date(entry.due_date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                          </div>
+                          {entry.responsible && (
+                            <div className="flex items-center space-x-1">
+                              <User className="h-4 w-4" />
+                              <span>{entry.responsible.name}</span>
+                            </div>
+                          )}
+                          {entry.installments && entry.installments > 1 && (
+                            <span>Parcela {entry.current_installment || 1}/{entry.installments}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4 ml-4">
-                    <div className="text-right">
-                      <p className={`text-2xl font-bold ${getTypeColor(entry.type)}`}>
-                        {entry.type === 'despesa' ? '-' : '+'}R$ {entry.value.toLocaleString()}
-                      </p>
-                      {entry.paidAt && (
-                        <p className="text-sm text-gray-500">
-                          Pago em {format(entry.paidAt, "dd/MM/yyyy", { locale: ptBR })}
-                        </p>
-                      )}
                     </div>
                     
-                    <div className="flex items-center space-x-2">
-                      <StatusIcon className={`h-5 w-5 ${
-                        entry.status === 'pago' ? 'text-green-600' :
-                        entry.status === 'vencido' ? 'text-red-600' : 'text-yellow-600'
-                      }`} />
-                      <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                        <Eye className="h-4 w-4" />
-                      </button>
+                    <div className="flex items-center space-x-4 ml-4">
+                      <div className="text-right">
+                        <p className={`text-2xl font-bold ${getTypeColor(entry.type)}`}>
+                          {entry.type === 'despesa' ? '-' : '+'}R$ {entry.value.toLocaleString()}
+                        </p>
+                        {entry.paid_at && (
+                          <p className="text-sm text-gray-500">
+                            Pago em {format(new Date(entry.paid_at), "dd/MM/yyyy", { locale: ptBR })}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <StatusIcon className={`h-5 w-5 ${
+                          entry.status === 'pago' ? 'text-green-600' :
+                          entry.status === 'vencido' ? 'text-red-600' : 'text-yellow-600'
+                        }`} />
+                        <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleEditEntry(entry)}
+                          className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteEntry(entry.id, entry.description)}
+                          disabled={deleteEntryMutation.isPending}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {deleteEntryMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
+              );
+            })}
+            
+            {entries.length === 0 && (
+              <div className="p-12 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <DollarSign className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500">Nenhuma entrada financeira encontrada</p>
               </div>
-            );
-          })}
-          
-          {filteredEntries.length === 0 && (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <DollarSign className="h-8 w-8 text-gray-400" />
-              </div>
-              <p className="text-gray-500">Nenhuma entrada financeira encontrada</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Modal de Entrada Financeira */}
+      {isModalOpen && (
+        <FinancialModal
+          entry={editingEntry}
+          onSave={handleSaveEntry}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingEntry(null);
+          }}
+          isLoading={createEntryMutation.isPending || updateEntryMutation.isPending}
+        />
+      )}
     </div>
   );
 };

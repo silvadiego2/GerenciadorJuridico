@@ -197,3 +197,30 @@ router.get('/summary', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+
+// DELETE /api/financial/:id - Deletar entrada financeira
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('financial_entries')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      message: 'Entrada financeira deletada com sucesso'
+    });
+  } catch (error) {
+    console.error('Erro ao deletar entrada financeira:', error);
+    res.status(500).json({
+      error: 'Erro ao deletar entrada financeira'
+    });
+  }
+});
+
+module.exports = router;

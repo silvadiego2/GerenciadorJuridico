@@ -107,6 +107,7 @@ export interface Document {
 export interface Financial {
   id: string;
   type: 'honorario' | 'despesa' | 'reembolso';
+  category?: string;
   description: string;
   value: number;
   status: 'pendente' | 'pago' | 'vencido';
@@ -114,7 +115,26 @@ export interface Financial {
   paidAt?: Date;
   processId?: string;
   clientId: string;
+  responsibleId?: string;
+  paymentMethod?: 'dinheiro' | 'pix' | 'transferencia' | 'boleto' | 'cartao';
+  installments?: number;
+  currentInstallment?: number;
+  notes?: string;
   createdAt: Date;
+  // Relacionamentos vindos do backend
+  client?: {
+    id: string;
+    name: string;
+  };
+  process?: {
+    id: string;
+    number: string;
+    subject: string;
+  };
+  responsible?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface Publication {

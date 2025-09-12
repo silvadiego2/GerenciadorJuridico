@@ -180,6 +180,14 @@ export const integrationsService = {
     apiClient.post('/api/integrations/config', data),
 };
 
+export const dashboardService = {
+  getSummary: () => 
+    apiClient.get('/api/dashboard/summary'),
+  
+  getStats: (period?: string) => 
+    apiClient.get('/api/dashboard/stats', period ? { period } : undefined),
+};
+
 export const usersService = {
   getAll: () => 
     apiClient.get('/api/users'),

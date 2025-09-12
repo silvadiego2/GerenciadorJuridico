@@ -157,4 +157,12 @@ export interface Dashboard {
   processesByStatus: { status: string; count: number }[];
   tasksByPriority: { priority: string; count: number }[];
   revenueByMonth: { month: string; value: number }[];
+  recentActivities?: Array<{
+    id: string;
+    type: 'process' | 'client' | 'task' | 'publication';
+    title: string;
+    description: string;
+    time: string | Date;
+    user: string;
+  }>;
 }

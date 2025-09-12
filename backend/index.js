@@ -63,6 +63,7 @@ const documentRoutes = require('./routes/documents');
 const financialRoutes = require('./routes/financial');
 const publicationRoutes = require('./routes/publications');
 const integrationRoutes = require('./routes/integrations');
+const dashboardRoutes = require('./routes/dashboard');
 
 // Rota de saúde
 app.get('/health', (req, res) => {
@@ -108,6 +109,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/financial', financialRoutes);
 app.use('/api/publications', publicationRoutes);
 app.use('/api/integrations', integrationRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Middleware de tratamento de erros
 app.use((error, req, res, next) => {

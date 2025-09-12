@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, FileText, Users, AlertTriangle } from 'lucide-react';
+import { Clock, FileText, Users, AlertTriangle, CheckSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -8,12 +8,17 @@ interface Activity {
   type: 'process' | 'client' | 'task' | 'publication';
   title: string;
   description: string;
-  time: Date;
+  time: string | Date;
   user: string;
 }
 
-const RecentActivities: React.FC = () => {
-  const activities: Activity[] = [
+interface RecentActivitiesProps {
+  activities?: Activity[];
+}
+
+const RecentActivities: React.FC<RecentActivitiesProps> = ({ activities = [] }) => {
+  // Fallback para atividades mockadas se não houver dados reais
+  const fallbackActivities: Activity[] = [
     {
       id: '1',
       type: 'process',
@@ -48,6 +53,8 @@ const RecentActivities: React.FC = () => {
     },
   ];
 
+  const displayActivities = activities.length > 0 ? activities : fallbackActivities;
+
   const getIcon = (type: Activity['type']) => {
     switch (type) {
       case 'process':
@@ -55,7 +62,7 @@ const RecentActivities: React.FC = () => {
       case 'client':
         return Users;
       case 'task':
-        return AlertTriangle;
+        return CheckSquare;
       case 'publication':
         return FileText;
       default:
@@ -70,9 +77,9 @@ const RecentActivities: React.FC = () => {
       case 'client':
         return 'text-green-600 bg-green-50';
       case 'task':
-        return 'text-red-600 bg-red-50';
-      case 'publication':
         return 'text-purple-600 bg-purple-50';
+      case 'publication':
+        return 'text-orange-600 bg-orange-50';
       default:
         return 'text-gray-600 bg-gray-50';
     }
@@ -82,11 +89,16 @@ const RecentActivities: React.FC = () => {
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       <div className="p-6 border-b border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900">Atividades Recentes</h3>
+        {activities.length === 0 && (
+          <p className="text-sm text-gray-500 mt-1">Dados de demonstração</p>
+        )}
       </div>
       <div className="p-6">
         <div className="space-y-6">
-          {activities.map((activity) => {
+          {displayActivities.slice(0, 8).map((activity) => {
             const Icon = getIcon(activity.type);
+            const activityTime = typeof activity.time === 'string' ? new Date(activity.time) : activity.time;
+            
             return (
               <div key={activity.id} className="flex items-start space-x-4">
                 <div className={`p-2 rounded-lg ${getIconColor(activity.type)}`}>
@@ -100,7 +112,7 @@ const RecentActivities: React.FC = () => {
                     {activity.description}
                   </p>
                   <div className="mt-1 flex items-center text-xs text-gray-500 space-x-2">
-                    <span>{format(activity.time, "d 'de' MMMM 'às' HH:mm", { locale: ptBR })}</span>
+                    <span>{format(activityTime, "d 'de' MMMM 'às' HH:mm", { locale: ptBR })}</span>
                     <span>•</span>
                     <span>{activity.user}</span>
                   </div>
@@ -108,6 +120,13 @@ const RecentActivities: React.FC = () => {
               </div>
             );
           })}
+          
+          {displayActivities.length === 0 && (
+            <div className="text-center py-8">
+              <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">Nenhuma atividade recente</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

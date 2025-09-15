@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financialService } from '../lib/api';
-import { Financial } from '../types';
+import { Financial as FinancialType } from '../types';
 import { format, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import FinancialModal from '../components/Financial/FinancialModal';
@@ -26,7 +26,7 @@ const Financial: React.FC = () => {
   const [selectedType, setSelectedType] = useState<'all' | 'honorario' | 'despesa' | 'receita' | 'reembolso'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'pendente' | 'pago' | 'vencido' | 'cancelado'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<Financial | null>(null);
+  const [editingEntry, setEditingEntry] = useState<FinancialType | null>(null);
   
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
@@ -107,7 +107,7 @@ const Financial: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleEditEntry = (entry: Financial) => {
+  const handleEditEntry = (entry: FinancialType) => {
     setEditingEntry(entry);
     setIsModalOpen(true);
   };
@@ -118,7 +118,7 @@ const Financial: React.FC = () => {
     }
   };
 
-  const handleSaveEntry = (entryData: Partial<Financial>) => {
+  const handleSaveEntry = (entryData: Partial<FinancialType>) => {
     if (editingEntry) {
       updateEntryMutation.mutate({ id: editingEntry.id, data: entryData });
     } else {

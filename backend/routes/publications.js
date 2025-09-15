@@ -26,7 +26,7 @@ router.get('/', authenticateToken, async (req, res) => {
         *,
         process:processes(id, number, subject),
         responsible:users!publications_responsible_id_fkey(id, name)
-      `)
+      `, { count: 'exact' })
       .order('date', { ascending: false });
 
     if (source && source !== 'all') {

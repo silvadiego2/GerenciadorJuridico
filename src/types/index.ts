@@ -139,12 +139,31 @@ export interface Financial {
 
 export interface Publication {
   id: string;
-  date: Date;
+  date: string;
   content: string;
-  source: 'dje' | 'dou' | 'tribunal';
+  source: 'dje-ba' | 'dou' | 'dje-trt' | 'dje-trf';
+  type: 'intimacao' | 'citacao' | 'publicacao' | 'edital' | 'despacho';
+  priority: 'baixa' | 'media' | 'alta' | 'urgente';
+  deadline?: string;
   processId?: string;
   read: boolean;
   acknowledged: boolean;
+  acknowledgedAt?: string;
+  acknowledgedBy?: string;
+  responsibleId?: string;
+  tags: string[];
+  oabNumbers: string[];
+  createdAt: string;
+  // Relacionamentos vindos do backend
+  process?: {
+    id: string;
+    number: string;
+    subject: string;
+  };
+  responsible?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface Dashboard {

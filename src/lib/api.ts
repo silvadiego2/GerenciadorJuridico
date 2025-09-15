@@ -164,6 +164,9 @@ export const publicationsService = {
   
   markAsRead: (id: string) => 
     apiClient.put(`/api/publications/${id}/read`),
+  
+  create: (data: any) => 
+    apiClient.post('/api/publications', data),
 };
 
 export const integrationsService = {

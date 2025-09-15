@@ -2,129 +2,111 @@ import React, { useState } from 'react';
 import { 
   BookOpen, Search, Filter, Eye, CheckCircle, Clock, 
   AlertTriangle, Download, Bell, Calendar, User,
-  ExternalLink, Tag, RefreshCw
+  ExternalLink, Tag, RefreshCw, Loader2
 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { publicationsService } from '../lib/api';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNotifications } from '../hooks/useNotifications';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface Publication {
   id: string;
-  date: Date;
+  date: string;
   content: string;
   source: 'dje-ba' | 'dou' | 'dje-trt' | 'dje-trf';
-  processNumber?: string;
-  processId?: string;
-  oabNumbers: string[];
+  process_id?: string;
+  oab_numbers: string[];
   type: 'intimacao' | 'citacao' | 'publicacao' | 'edital' | 'despacho';
   priority: 'baixa' | 'media' | 'alta' | 'urgente';
-  deadline?: Date;
+  deadline?: string;
   acknowledged: boolean;
+  acknowledged_at?: string;
+  acknowledged_by?: string;
   read: boolean;
-  responsibleId?: string;
-  responsibleName?: string;
+  responsible_id?: string;
   tags: string[];
-  clientName?: string;
-  createdAt: Date;
+  created_at: string;
+  // Relacionamentos vindos do backend
+  process?: {
+    id: string;
+    number: string;
+    subject: string;
+  };
+  responsible?: {
+    id: string;
+    name: string;
+  };
 }
 
 const Publications: React.FC = () => {
-  const [publications] = useState<Publication[]>([
-    {
-      id: '1',
-      date: new Date('2024-12-10'),
-      content: 'INTIMAÇÃO - Processo nº 1001234-56.2024.8.05.0001 - Fica a parte autora, por meio de seu advogado Dr. João Silva (OAB/BA 12345), intimada para apresentar documentos complementares no prazo de 15 (quinze) dias, sob pena de preclusão.',
-      source: 'dje-ba',
-      processNumber: '1001234-56.2024.8.05.0001',
-      processId: '1',
-      oabNumbers: ['BA 12345'],
-      type: 'intimacao',
-      priority: 'alta',
-      deadline: addDays(new Date('2024-12-10'), 15),
-      acknowledged: false,
-      read: false,
-      responsibleId: '1',
-      responsibleName: 'Dr. João Silva',
-      tags: ['documentos', 'prazo', 'preclusão'],
-      clientName: 'João da Silva Santos',
-      createdAt: new Date('2024-12-10T08:30:00'),
-    },
-    {
-      id: '2',
-      date: new Date('2024-12-09'),
-      content: 'CITAÇÃO - Processo nº 2002345-67.2024.8.05.0002 - Fica citado o réu João da Silva para responder aos termos da ação no prazo de 15 (quinze) dias, contados da juntada do mandado aos autos.',
-      source: 'dje-ba',
-      processNumber: '2002345-67.2024.8.05.0002',
-      processId: '2',
-      oabNumbers: ['BA 12345'],
-      type: 'citacao',
-      priority: 'media',
-      deadline: addDays(new Date('2024-12-09'), 15),
-      acknowledged: true,
-      read: true,
-      responsibleId: '1',
-      responsibleName: 'Dr. João Silva',
-      tags: ['citação', 'contestação'],
-      clientName: 'Empresa ABC Ltda',
-      createdAt: new Date('2024-12-09T09:15:00'),
-    },
-    {
-      id: '3',
-      date: new Date('2024-12-08'),
-      content: 'DESPACHO - Processo nº 3003456-78.2024.8.05.0003 - Defiro o pedido de tutela antecipada. Cite-se o réu. Intime-se a parte autora para recolhimento das custas processuais no prazo de 10 dias.',
-      source: 'dje-ba',
-      processNumber: '3003456-78.2024.8.05.0003',
-      oabNumbers: ['BA 12345'],
-      type: 'despacho',
-      priority: 'urgente',
-      deadline: addDays(new Date('2024-12-08'), 10),
-      acknowledged: true,
-      read: true,
-      responsibleId: '1',
-      responsibleName: 'Dr. João Silva',
-      tags: ['tutela', 'custas', 'citação'],
-      createdAt: new Date('2024-12-08T10:45:00'),
-    },
-    {
-      id: '4',
-      date: new Date('2024-12-07'),
-      content: 'PUBLICAÇÃO - Processo nº 4004567-89.2024.4.01.3400 - Audiência de conciliação designada para o dia 20/12/2024, às 14h00min, na sala de audiências da 1ª Vara do Trabalho.',
-      source: 'dje-trt',
-      processNumber: '4004567-89.2024.4.01.3400',
-      oabNumbers: ['BA 12345'],
-      type: 'publicacao',
-      priority: 'alta',
-      deadline: new Date('2024-12-20T14:00:00'),
-      acknowledged: false,
-      read: true,
-      responsibleId: '2',
-      responsibleName: 'Maria Santos',
-      tags: ['audiência', 'conciliação', 'trabalhista'],
-      createdAt: new Date('2024-12-07T11:20:00'),
-    }
-  ]);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSource, setSelectedSource] = useState<'all' | 'dje-ba' | 'dou' | 'dje-trt' | 'dje-trf'>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'intimacao' | 'citacao' | 'publicacao' | 'edital' | 'despacho'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'nao_lida' | 'lida' | 'nao_ciente' | 'ciente'>('all');
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'baixa' | 'media' | 'alta' | 'urgente'>('all');
+  
+  const queryClient = useQueryClient();
+  const { success, error } = useNotifications();
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const filteredPublications = publications.filter(pub => {
-    const matchesSearch = pub.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (pub.processNumber && pub.processNumber.includes(searchTerm)) ||
-                         (pub.clientName && pub.clientName.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesSource = selectedSource === 'all' || pub.source === selectedSource;
-    const matchesType = selectedType === 'all' || pub.type === selectedType;
-    const matchesPriority = selectedPriority === 'all' || pub.priority === selectedPriority;
-    
-    let matchesStatus = true;
-    if (selectedStatus === 'nao_lida') matchesStatus = !pub.read;
-    else if (selectedStatus === 'lida') matchesStatus = pub.read;
-    else if (selectedStatus === 'nao_ciente') matchesStatus = !pub.acknowledged;
-    else if (selectedStatus === 'ciente') matchesStatus = pub.acknowledged;
-    
-    return matchesSearch && matchesSource && matchesType && matchesStatus && matchesPriority;
+  // Query para buscar publicações
+  const { data: publicationsData, isLoading, error: queryError } = useQuery({
+    queryKey: ['publications', debouncedSearchTerm, selectedSource, selectedType, selectedStatus, selectedPriority],
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      
+      if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+      if (selectedSource !== 'all') params.source = selectedSource;
+      if (selectedType !== 'all') params.type = selectedType;
+      if (selectedPriority !== 'all') params.priority = selectedPriority;
+      
+      // Mapear status para parâmetros do backend
+      if (selectedStatus === 'nao_lida') params.read = 'false';
+      else if (selectedStatus === 'lida') params.read = 'true';
+      else if (selectedStatus === 'nao_ciente') params.acknowledged = 'false';
+      else if (selectedStatus === 'ciente') params.acknowledged = 'true';
+      
+      return publicationsService.getAll(params);
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutos
   });
+
+  const publications = publicationsData?.publications || [];
+
+  // Mutation para dar ciência
+  const acknowledgeMutation = useMutation({
+    mutationFn: publicationsService.acknowledge,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['publications'] });
+      success('Sucesso', 'Ciência registrada com sucesso!');
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao dar ciência');
+    },
+  });
+
+  // Mutation para marcar como lida
+  const markAsReadMutation = useMutation({
+    mutationFn: publicationsService.markAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['publications'] });
+    },
+    onError: (err: any) => {
+      error('Erro', err.message || 'Erro ao marcar como lida');
+    },
+  });
+
+  const handleAcknowledge = (publicationId: string) => {
+    acknowledgeMutation.mutate(publicationId);
+  };
+
+  const handleMarkAsRead = (publicationId: string) => {
+    if (!publications.find(p => p.id === publicationId)?.read) {
+      markAsReadMutation.mutate(publicationId);
+    }
+  };
 
   const getSourceName = (source: string) => {
     switch (source) {
@@ -161,7 +143,7 @@ const Publications: React.FC = () => {
     if (!publication.deadline) return null;
     
     const now = new Date();
-    const deadline = publication.deadline;
+    const deadline = new Date(publication.deadline);
     
     if (isBefore(deadline, now)) {
       return { type: 'overdue', label: 'Prazo vencido', color: 'text-red-600' };
@@ -172,8 +154,22 @@ const Publications: React.FC = () => {
     }
   };
 
+  // Calcular estatísticas dinamicamente
   const unreadCount = publications.filter(p => !p.read).length;
   const unacknowledgedCount = publications.filter(p => !p.acknowledged).length;
+  const todayCount = publications.filter(p => 
+    format(new Date(p.date), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+  ).length;
+
+  if (queryError) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">Erro ao carregar publicações: {(queryError as Error).message}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -183,8 +179,12 @@ const Publications: React.FC = () => {
           <p className="text-gray-600">Monitoramento de diários oficiais e intimações</p>
         </div>
         <div className="flex space-x-3">
-          <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2">
-            <RefreshCw className="h-4 w-4" />
+          <button 
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['publications'] })}
+            disabled={isLoading}
+            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors flex items-center space-x-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Atualizar</span>
           </button>
           <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
@@ -224,11 +224,7 @@ const Publications: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Hoje</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {publications.filter(p => 
-                  format(p.date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                ).length}
-              </p>
+              <p className="text-2xl font-bold text-blue-600">{todayCount}</p>
             </div>
             <div className="bg-blue-100 p-3 rounded-lg">
               <BookOpen className="h-6 w-6 text-blue-600" />
@@ -313,127 +309,148 @@ const Publications: React.FC = () => {
       {/* Lista de Publicações */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {filteredPublications.length} publicação{filteredPublications.length !== 1 ? 'ões' : ''} encontrada{filteredPublications.length !== 1 ? 's' : ''}
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {isLoading ? 'Carregando...' : `${publications.length} publicação${publications.length !== 1 ? 'ões' : ''} encontrada${publications.length !== 1 ? 's' : ''}`}
+            </h2>
+            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+          </div>
         </div>
 
-        <div className="divide-y divide-gray-200">
-          {filteredPublications.map((publication) => {
-            const urgency = getUrgencyStatus(publication);
-            return (
-              <div key={publication.id} className={`p-6 hover:bg-gray-50 transition-colors ${
-                !publication.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-              }`}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-4 flex-1">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <BookOpen className="h-6 w-6 text-blue-600" />
+        {isLoading ? (
+          <div className="p-12 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-500">Carregando publicações...</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {publications.map((publication) => {
+              const urgency = getUrgencyStatus(publication);
+              return (
+                <div 
+                  key={publication.id} 
+                  className={`p-6 hover:bg-gray-50 transition-colors ${
+                    !publication.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                  }`}
+                  onClick={() => handleMarkAsRead(publication.id)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4 flex-1">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <BookOpen className="h-6 w-6 text-blue-600" />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <span className={`px-2 py-1 text-xs rounded-full ${getTypeColor(publication.type)}`}>
+                            {publication.type.charAt(0).toUpperCase() + publication.type.slice(1)}
+                          </span>
+                          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                            {getSourceName(publication.source)}
+                          </span>
+                          <span className={`px-2 py-1 rounded-md border text-xs ${getPriorityColor(publication.priority)}`}>
+                            {publication.priority.charAt(0).toUpperCase() + publication.priority.slice(1)}
+                          </span>
+                          {!publication.read && (
+                            <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                              Não lida
+                            </span>
+                          )}
+                          {!publication.acknowledged && (
+                            <span className="px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-800">
+                              Sem ciência
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p className="text-sm text-gray-900 mb-3 leading-relaxed">
+                          {publication.content}
+                        </p>
+                        
+                        <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+                          <div className="flex items-center space-x-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>{format(new Date(publication.date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                          </div>
+                          {publication.process && (
+                            <span className="font-mono">{publication.process.number}</span>
+                          )}
+                          {publication.responsible && (
+                            <div className="flex items-center space-x-1">
+                              <User className="h-4 w-4" />
+                              <span>{publication.responsible.name}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {publication.deadline && urgency && (
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Clock className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-gray-600">
+                              Prazo: {format(new Date(publication.deadline), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            </span>
+                            <span className={`text-sm font-medium ${urgency.color}`}>
+                              ({urgency.label})
+                            </span>
+                          </div>
+                        )}
+                        
+                        {publication.tags && publication.tags.length > 0 && (
+                          <div className="flex items-center space-x-2">
+                            <Tag className="h-4 w-4 text-gray-400" />
+                            <div className="flex space-x-1">
+                              {publication.tags.map((tag, index) => (
+                                <span key={index} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <span className={`px-2 py-1 text-xs rounded-full ${getTypeColor(publication.type)}`}>
-                          {publication.type.charAt(0).toUpperCase() + publication.type.slice(1)}
-                        </span>
-                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                          {getSourceName(publication.source)}
-                        </span>
-                        <span className={`px-2 py-1 rounded-md border text-xs ${getPriorityColor(publication.priority)}`}>
-                          {publication.priority.charAt(0).toUpperCase() + publication.priority.slice(1)}
-                        </span>
-                        {!publication.read && (
-                          <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
-                            Não lida
-                          </span>
-                        )}
-                        {!publication.acknowledged && (
-                          <span className="px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-800">
-                            Sem ciência
-                          </span>
-                        )}
-                      </div>
-                      
-                      <p className="text-sm text-gray-900 mb-3 leading-relaxed">
-                        {publication.content}
-                      </p>
-                      
-                      <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>{format(publication.date, "dd/MM/yyyy", { locale: ptBR })}</span>
-                        </div>
-                        {publication.processNumber && (
-                          <span className="font-mono">{publication.processNumber}</span>
-                        )}
-                        {publication.clientName && (
-                          <span>{publication.clientName}</span>
-                        )}
-                        {publication.responsibleName && (
-                          <div className="flex items-center space-x-1">
-                            <User className="h-4 w-4" />
-                            <span>{publication.responsibleName}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {publication.deadline && urgency && (
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm text-gray-600">
-                            Prazo: {format(publication.deadline, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          </span>
-                          <span className={`text-sm font-medium ${urgency.color}`}>
-                            ({urgency.label})
-                          </span>
-                        </div>
+                    <div className="flex items-center space-x-2 ml-4">
+                      {!publication.acknowledged && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAcknowledge(publication.id);
+                          }}
+                          disabled={acknowledgeMutation.isPending}
+                          className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 disabled:opacity-50 transition-colors"
+                        >
+                          {acknowledgeMutation.isPending ? 'Dando ciência...' : 'Dar Ciência'}
+                        </button>
                       )}
-                      
-                      {publication.tags.length > 0 && (
-                        <div className="flex items-center space-x-2">
-                          <Tag className="h-4 w-4 text-gray-400" />
-                          <div className="flex space-x-1">
-                            {publication.tags.map((tag, index) => (
-                              <span key={index} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                        <Download className="h-4 w-4" />
+                      </button>
+                      <button className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
+                        <ExternalLink className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-2 ml-4">
-                    {!publication.acknowledged && (
-                      <button className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors">
-                        Dar Ciência
-                      </button>
-                    )}
-                    <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
-                      <Download className="h-4 w-4" />
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
-                      <ExternalLink className="h-4 w-4" />
-                    </button>
-                  </div>
                 </div>
+              );
+            })}
+            
+            {publications.length === 0 && !isLoading && (
+              <div className="p-12 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <BookOpen className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500">Nenhuma publicação encontrada</p>
+                <p className="text-gray-400 text-sm mt-2">
+                  As publicações aparecerão aqui quando forem capturadas automaticamente dos diários oficiais
+                </p>
               </div>
-            );
-          })}
-          
-          {filteredPublications.length === 0 && (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="h-8 w-8 text-gray-400" />
-              </div>
-              <p className="text-gray-500">Nenhuma publicação encontrada</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

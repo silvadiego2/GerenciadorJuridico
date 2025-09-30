@@ -136,6 +136,12 @@ export const documentsService = {
   
   create: (data: any) => 
     apiClient.post('/api/documents', data),
+  
+  update: (id: string, data: any) => 
+    apiClient.put(`/api/documents/${id}`, data),
+  
+  delete: (id: string) => 
+    apiClient.delete(`/api/documents/${id}`),
 };
 
 export const financialService = {

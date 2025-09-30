@@ -141,4 +141,69 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/documents/:id - Atualizar documento
+router.put('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = {
+      ...req.body,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: updatedDocument, error } = await supabase
+      .from('documents')
+      .update(updateData)
+      .eq('id', id)
+      .select(`
+        *,
+        process:processes(id, number, subject),
+        client:clients(id, name),
+        uploaded_by_user:users!documents_uploaded_by_fkey(id, name)
+      `)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!updatedDocument) {
+      return res.status(404).json({
+        error: 'Documento não encontrado'
+      });
+    }
+
+    res.json(updatedDocument);
+  } catch (error) {
+    console.error('Erro ao atualizar documento:', error);
+    res.status(500).json({
+      error: 'Erro ao atualizar documento'
+    });
+  }
+});
+
+// DELETE /api/documents/:id - Deletar documento
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      message: 'Documento deletado com sucesso'
+    });
+  } catch (error) {
+    console.error('Erro ao deletar documento:', error);
+    res.status(500).json({
+      error: 'Erro ao deletar documento'
+    });
+  }
+});
+
 module.exports = router;

@@ -3,6 +3,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 class ApiClient {
   private baseURL: string;
+  public get baseURL() { return this.baseURL; }
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;

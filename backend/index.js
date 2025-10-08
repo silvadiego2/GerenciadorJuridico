@@ -110,6 +110,7 @@ app.use('/api/financial', financialRoutes);
 app.use('/api/publications', publicationRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Middleware de tratamento de erros
 app.use((error, req, res, next) => {

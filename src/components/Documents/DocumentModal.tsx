@@ -3,6 +3,7 @@ import { X, Upload, FileText, Tag, User, Folder, Link } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { clientsService, processesService } from '../../lib/api';
 import { Client, Process } from '../../types';
+import { formatFileSize } from '../../utils/helpers';
 
 interface DocumentModalProps {
   document: any | null;
@@ -132,14 +133,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({ document, onSave, onClose
         handleChange('name', file.name);
       }
     }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -408,14 +401,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({ document, onSave, onClose
       </div>
     </div>
   );
-
-  function formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
 };
 
 export default DocumentModal;

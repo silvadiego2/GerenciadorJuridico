@@ -64,6 +64,7 @@ const financialRoutes = require('./routes/financial');
 const publicationRoutes = require('./routes/publications');
 const integrationRoutes = require('./routes/integrations');
 const dashboardRoutes = require('./routes/dashboard');
+const reportRoutes = require('./routes/reports');
 
 // Rota de saúde
 app.get('/health', (req, res) => {

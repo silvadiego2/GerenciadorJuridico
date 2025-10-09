@@ -2,11 +2,14 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 class ApiClient {
-  private baseURL: string;
-  public get baseURL() { return this.baseURL; }
+  private _baseURL: string;
 
   constructor(baseURL: string) {
-    this.baseURL = baseURL;
+    this._baseURL = baseURL;
+  }
+
+  get baseURL(): string {
+    return this._baseURL;
   }
 
   private getAuthHeaders(): HeadersInit {
@@ -32,7 +35,7 @@ class ApiClient {
   }
 
   async get<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(`${this.baseURL}${endpoint}`);
+    const url = new URL(`${this._baseURL}${endpoint}`);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         url.searchParams.append(key, value);
@@ -48,7 +51,7 @@ class ApiClient {
   }
 
   async post<T>(endpoint: string, data?: any): Promise<T> {
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    const response = await fetch(`${this._baseURL}${endpoint}`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: data ? JSON.stringify(data) : undefined,
@@ -58,7 +61,7 @@ class ApiClient {
   }
 
   async put<T>(endpoint: string, data?: any): Promise<T> {
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    const response = await fetch(`${this._baseURL}${endpoint}`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: data ? JSON.stringify(data) : undefined,
@@ -68,7 +71,7 @@ class ApiClient {
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    const response = await fetch(`${this._baseURL}${endpoint}`, {
       method: 'DELETE',
       headers: this.getAuthHeaders(),
     });
@@ -199,15 +202,37 @@ export const dashboardService = {
 };
 
 export const usersService = {
-  getAll: () => 
+  getAll: () =>
     apiClient.get('/api/users'),
-  
-  getById: (id: string) => 
+
+  getById: (id: string) =>
     apiClient.get(`/api/users/${id}`),
-  
-  update: (id: string, data: any) => 
+
+  update: (id: string, data: any) =>
     apiClient.put(`/api/users/${id}`, data),
-  
-  delete: (id: string) => 
+
+  delete: (id: string) =>
     apiClient.delete(`/api/users/${id}`),
+};
+
+export const reportsService = {
+  getData: (reportType: string, dateRange: string) =>
+    apiClient.get('/api/reports', { type: reportType, range: dateRange }),
+
+  exportPDF: async (reportType: string, dateRange: string): Promise<Blob> => {
+    const response = await fetch(`${apiClient.baseURL}/api/reports/export`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+      },
+      body: JSON.stringify({ type: reportType, range: dateRange }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao exportar relatório');
+    }
+
+    return response.blob();
+  },
 };

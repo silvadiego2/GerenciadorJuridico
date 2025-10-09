@@ -32,8 +32,8 @@ const getStartDate = (range) => {
   }
 };
 
-// GET /api/reports/data - Buscar dados para relatórios
-router.get('/data', authenticateToken, async (req, res) => {
+// GET /api/reports - Buscar dados para relatórios
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { type, range = '30d' } = req.query;
     const startDate = getStartDate(range);

@@ -1,25 +1,52 @@
 import React, { useState } from 'react';
 import { useAuthContext } from '../../contexts/AuthContext';
-import { Scale, Eye, EyeOff } from 'lucide-react';
+import { Scale, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { clsx } from 'clsx';
+import { authService } from '../../lib/auth';
 
 const LoginForm: React.FC = () => {
   const { login } = useAuthContext();
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('estagiario');
+  const [oab, setOab] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccessMessage('');
 
     try {
-      await login(email, password);
-    } catch (err) {
-      setError('Credenciais inválidas');
+      if (isRegisterMode) {
+        await authService.register({
+          name,
+          email,
+          password,
+          role,
+          oab: oab || undefined,
+          phone: phone || undefined
+        });
+        setSuccessMessage('Conta criada com sucesso! Faça login para continuar.');
+        setIsRegisterMode(false);
+        setName('');
+        setEmail('');
+        setPassword('');
+        setOab('');
+        setPhone('');
+        setRole('estagiario');
+      } else {
+        await login(email, password);
+      }
+    } catch (err: any) {
+      setError(err.message || (isRegisterMode ? 'Erro ao criar conta' : 'Credenciais inválidas'));
     } finally {
       setLoading(false);
     }
@@ -48,7 +75,53 @@ const LoginForm: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-xl p-8">
+          <div className="mb-6 flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setIsRegisterMode(false); setError(''); setSuccessMessage(''); }}
+              className={clsx(
+                'flex-1 py-2 px-4 rounded-md font-medium transition-all',
+                !isRegisterMode
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              )}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsRegisterMode(true); setError(''); setSuccessMessage(''); }}
+              className={clsx(
+                'flex-1 py-2 px-4 rounded-md font-medium transition-all flex items-center justify-center gap-2',
+                isRegisterMode
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              )}
+            >
+              <UserPlus className="h-4 w-4" />
+              Criar Conta
+            </button>
+          </div>
+
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {isRegisterMode && (
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                  Nome Completo
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Seu nome completo"
+                />
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 E-mail
@@ -96,6 +169,66 @@ const LoginForm: React.FC = () => {
               </div>
             </div>
 
+            {isRegisterMode && (
+              <>
+                <div>
+                  <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                    Perfil
+                  </label>
+                  <select
+                    id="role"
+                    name="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="estagiario">Estagiário</option>
+                    <option value="advogado">Advogado</option>
+                    <option value="admin">Administrador</option>
+                    <option value="cliente">Cliente</option>
+                  </select>
+                </div>
+
+                {(role === 'advogado' || role === 'admin') && (
+                  <div>
+                    <label htmlFor="oab" className="block text-sm font-medium text-gray-700">
+                      OAB (opcional)
+                    </label>
+                    <input
+                      id="oab"
+                      name="oab"
+                      type="text"
+                      value={oab}
+                      onChange={(e) => setOab(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="BA 12345"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                    Telefone (opcional)
+                  </label>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="(71) 99999-9999"
+                  />
+                </div>
+              </>
+            )}
+
+            {successMessage && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
+                {successMessage}
+              </div>
+            )}
+
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
                 {error}
@@ -110,10 +243,14 @@ const LoginForm: React.FC = () => {
                 loading && 'opacity-50 cursor-not-allowed'
               )}
             >
-              {loading ? 'Entrando...' : 'Entrar'}
+              {loading
+                ? isRegisterMode ? 'Criando...' : 'Entrando...'
+                : isRegisterMode ? 'Criar Conta' : 'Entrar'
+              }
             </button>
           </form>
 
+          {!isRegisterMode && (
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -141,6 +278,7 @@ const LoginForm: React.FC = () => {
               ))}
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

@@ -212,7 +212,7 @@ router.get('/', authenticateToken, async (req, res) => {
           const dueDate = new Date(t.due_date);
           return dueDate >= now && dueDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
         }).length || 0,
-        urgencia: 'critico' as const
+        urgencia: 'critico'
       },
       { 
         prazo: '8-15 dias', 
@@ -221,7 +221,7 @@ router.get('/', authenticateToken, async (req, res) => {
           return dueDate > new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) && 
                  dueDate <= new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
         }).length || 0,
-        urgencia: 'atencao' as const
+        urgencia: 'atencao'
       },
       { 
         prazo: '16-30 dias', 
@@ -230,7 +230,7 @@ router.get('/', authenticateToken, async (req, res) => {
           return dueDate > new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000) && 
                  dueDate <= new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
         }).length || 0,
-        urgencia: 'normal' as const
+        urgencia: 'normal'
       },
       { 
         prazo: 'Mais de 30 dias', 
@@ -238,7 +238,7 @@ router.get('/', authenticateToken, async (req, res) => {
           const dueDate = new Date(t.due_date);
           return dueDate > new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
         }).length || 0,
-        urgencia: 'normal' as const
+        urgencia: 'normal'
       }
     ];
 

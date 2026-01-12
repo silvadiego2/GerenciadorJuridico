@@ -1,33 +1,12 @@
 import { User } from '../types';
-import { mockDemoUsers } from './mock-data';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 
-const generateMockToken = (user: User): string => {
-  const payload = {
-    id: user.id,
-    email: user.email,
-    role: user.role,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60),
-  };
-  return btoa(JSON.stringify(payload));
-};
-
 export const authService = {
   login: async (email: string, password: string): Promise<User> => {
     try {
-      const demoUser = mockDemoUsers[email];
-
-      if (demoUser && password === 'demo123') {
-        const token = generateMockToken(demoUser);
-        localStorage.setItem(TOKEN_KEY, token);
-        localStorage.setItem(USER_KEY, JSON.stringify(demoUser));
-        return demoUser;
-      }
-
       const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -42,10 +21,11 @@ export const authService = {
       }
 
       const { user, token } = await response.json();
-
+      
+      // Armazenar token e dados do usuário
       localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
-
+      
       return user;
     } catch (error) {
       console.error('Erro no login:', error);

@@ -1,4 +1,4 @@
-import { Client, Process, Task, Financial, Publication, Dashboard, ProcessMovement, Document, User } from '../types';
+import { Client, Process, Task, Financial, Publication, Dashboard, ProcessMovement, Document } from '../types';
 
 export const mockClients: Client[] = [
   {
@@ -188,51 +188,6 @@ const mockPublications: Publication[] = [
     acknowledged: true,
   },
 ];
-
-export const mockDemoUsers: Record<string, User> = {
-  'joao@escritorio.com': {
-    id: 'd79ca4d0-3628-45ae-af56-c01e74d5e3d6',
-    name: 'João Silva',
-    email: 'joao@escritorio.com',
-    role: 'advogado',
-    avatar: '',
-    phone: '(71) 98765-4321',
-    oab: 'BA 123456',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-  'maria@escritorio.com': {
-    id: '550e8400-e29b-41d4-a716-446655440002',
-    name: 'Maria Santos',
-    email: 'maria@escritorio.com',
-    role: 'estagiario',
-    avatar: '',
-    phone: '(71) 98765-4322',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-  'admin@escritorio.com': {
-    id: '550e8400-e29b-41d4-a716-446655440003',
-    name: 'Carlos Administrador',
-    email: 'admin@escritorio.com',
-    role: 'admin',
-    avatar: '',
-    phone: '(71) 98765-4323',
-    oab: 'BA 999999',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-  'cliente@teste.com': {
-    id: '550e8400-e29b-41d4-a716-446655440004',
-    name: 'João da Silva Santos',
-    email: 'cliente@teste.com',
-    role: 'cliente',
-    avatar: '',
-    phone: '(71) 98765-4324',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-};
 
 export const mockDashboard: Dashboard = {
   totalProcesses: 150,

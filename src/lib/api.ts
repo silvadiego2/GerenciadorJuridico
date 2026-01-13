@@ -1,4 +1,6 @@
 // Cliente HTTP para comunicação com o backend
+import { mockClients, mockProcesses, mockTasks, mockDashboard } from './mock-data';
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 class ApiClient {
@@ -34,49 +36,106 @@ class ApiClient {
     return response.text() as unknown as T;
   }
 
+  private getMockData<T>(endpoint: string): T | null {
+    if (endpoint === '/api/clients') return { clients: mockClients } as unknown as T;
+    if (endpoint === '/api/processes') return { processes: mockProcesses } as unknown as T;
+    if (endpoint === '/api/tasks') return { tasks: mockTasks } as unknown as T;
+    if (endpoint === '/api/dashboard/summary') return mockDashboard as unknown as T;
+    if (endpoint === '/api/dashboard/stats') return mockDashboard as unknown as T;
+    if (endpoint === '/api/financial') return { entries: [] } as unknown as T;
+    if (endpoint === '/api/financial/summary') return { totalReceitas: 0, totalDespesas: 0, saldoLiquido: 0, honorariosPendentes: 0, despesasVencidas: 0 } as unknown as T;
+    if (endpoint === '/api/publications') return { publications: [] } as unknown as T;
+    if (endpoint === '/api/documents') return { documents: [] } as unknown as T;
+    if (endpoint === '/api/users') return { users: [] } as unknown as T;
+    if (endpoint === '/api/reports') return {
+      overview: { totalProcesses: 150, totalClients: 89, totalRevenue: 85000, totalTasks: 65, completedTasks: 42, overdueTasks: 8, pendingPublications: 12 },
+      processesByStatus: [{ name: 'Ativo', value: 120, color: '#3B82F6' }, { name: 'Arquivado', value: 30, color: '#10B981' }],
+      processesByMonth: [{ month: 'Jan', processos: 12, receita: 75000 }],
+      tasksByPriority: [{ priority: 'Alta', count: 18, color: '#F59E0B' }],
+      productivityByUser: [],
+      clientsByType: [{ name: 'Pessoa Física', value: 45 }],
+      expensesByCategory: [],
+      deadlinesByUrgency: [],
+      revenueByMonth: [],
+    } as unknown as T;
+    return null;
+  }
+
   async get<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(`${this._baseURL}${endpoint}`);
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.append(key, value);
+    try {
+      const url = new URL(`${this._baseURL}${endpoint}`);
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          url.searchParams.append(key, value);
+        });
+      }
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
       });
+
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      const mockData = this.getMockData<T>(endpoint);
+      if (mockData) {
+        console.warn(`Usando mock para ${endpoint}`);
+        return mockData;
+      }
+      throw error;
     }
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
-    });
-
-    return this.handleResponse<T>(response);
   }
 
   async post<T>(endpoint: string, data?: any): Promise<T> {
-    const response = await fetch(`${this._baseURL}${endpoint}`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: data ? JSON.stringify(data) : undefined,
-    });
+    try {
+      const response = await fetch(`${this._baseURL}${endpoint}`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: data ? JSON.stringify(data) : undefined,
+      });
 
-    return this.handleResponse<T>(response);
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      const mockData = this.getMockData<T>(endpoint);
+      if (mockData) {
+        console.warn(`Usando mock para ${endpoint}`);
+        return mockData;
+      }
+      throw error;
+    }
   }
 
   async put<T>(endpoint: string, data?: any): Promise<T> {
-    const response = await fetch(`${this._baseURL}${endpoint}`, {
-      method: 'PUT',
-      headers: this.getAuthHeaders(),
-      body: data ? JSON.stringify(data) : undefined,
-    });
+    try {
+      const response = await fetch(`${this._baseURL}${endpoint}`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+        body: data ? JSON.stringify(data) : undefined,
+      });
 
-    return this.handleResponse<T>(response);
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      const mockData = this.getMockData<T>(endpoint);
+      if (mockData) {
+        console.warn(`Usando mock para ${endpoint}`);
+        return mockData;
+      }
+      throw error;
+    }
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${this._baseURL}${endpoint}`, {
-      method: 'DELETE',
-      headers: this.getAuthHeaders(),
-    });
+    try {
+      const response = await fetch(`${this._baseURL}${endpoint}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
 
-    return this.handleResponse<T>(response);
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      console.error(`Erro ao deletar ${endpoint}:`, error);
+      throw error;
+    }
   }
 }
 

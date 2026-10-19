@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Scale, Clock, DollarSign, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, Scale, Clock, DollarSign, Trash2, Loader2, DownloadCloud } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { processesService } from '../lib/api';
 import { Process } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import ProcessModal from '../components/Processes/ProcessModal';
+import { ImportOabModal } from '../components/Processes/ImportOabModal';
 import { useNotifications } from '../hooks/useNotifications';
 import { useDebounce } from '../hooks/useDebounce';
 
@@ -13,8 +14,9 @@ const Processes: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'ativo' | 'suspenso' | 'arquivado' | 'baixado'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isOabModalOpen, setIsOabModalOpen] = useState(false);
   const [editingProcess, setEditingProcess] = useState<Process | null>(null);
-  
+
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -95,6 +97,11 @@ const Processes: React.FC = () => {
     }
   };
 
+  const handleOabImportSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['processes'] });
+    success('Sucesso', 'Processos importados com sucesso!');
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ativo':
@@ -135,18 +142,27 @@ const Processes: React.FC = () => {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Processos</h1>
           <p className="text-gray-600">Gerencie seus processos judiciais</p>
         </div>
-        <button 
-          onClick={handleCreateProcess}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Novo Processo</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsOabModalOpen(true)}
+            className="border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 text-sm font-medium"
+          >
+            <DownloadCloud className="h-4 w-4" />
+            <span>Buscar por OAB</span>
+          </button>
+          <button 
+            onClick={handleCreateProcess}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Novo Processo</span>
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -198,7 +214,7 @@ const Processes: React.FC = () => {
               <div key={process.id} className="p-6 hover:bg-gray-50 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-4 flex-1">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       <Scale className="h-6 w-6 text-blue-600" />
                     </div>
                     
@@ -242,7 +258,7 @@ const Processes: React.FC = () => {
                     <div className="text-right text-sm text-gray-600 hidden sm:block">
                       <p>Atualizado em</p>
                       <p className="font-medium">
-                        {format(new Date(process.updatedAt), "dd/MM/yyyy", { locale: ptBR })}
+                        {process.updatedAt ? format(new Date(process.updatedAt), "dd/MM/yyyy", { locale: ptBR }) : '-'}
                       </p>
                     </div>
                     
@@ -288,7 +304,9 @@ const Processes: React.FC = () => {
                   <div className="text-center">
                     <p className="text-sm text-gray-600">Dias ativo</p>
                     <p className="text-lg font-semibold text-gray-900">
-                      {Math.floor((new Date().getTime() - new Date(process.createdAt).getTime()) / (1000 * 60 * 60 * 24))}
+                      {process.createdAt
+                        ? Math.floor((new Date().getTime() - new Date(process.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+                        : 0}
                     </p>
                   </div>
                 </div>
@@ -307,7 +325,7 @@ const Processes: React.FC = () => {
         )}
       </div>
 
-      {/* Modal de Processo */}
+      {/* Modal de Processo (Manual) */}
       {isModalOpen && (
         <ProcessModal
           process={editingProcess}
@@ -319,6 +337,13 @@ const Processes: React.FC = () => {
           isLoading={createProcessMutation.isPending || updateProcessMutation.isPending}
         />
       )}
+
+      {/* Modal de Busca por OAB */}
+      <ImportOabModal
+        isOpen={isOabModalOpen}
+        onClose={() => setIsOabModalOpen(false)}
+        onSuccess={handleOabImportSuccess}
+      />
     </div>
   );
 };

@@ -1,7 +1,6 @@
 // api/search-oab.ts
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   // Configuração básica de CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,9 +26,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const datajudKey = process.env.DATAJUD_API_KEY || '';
-    
-    // Consulta ao DataJud CNJ ou agregador judicial
-    // Se ainda não tiver a chave de produção, você pode testar o fluxo com dados formatados
+
+    // Se ainda não tiver a chave de produção configurada nas variáveis da Vercel, retorna simulação
     if (!datajudKey) {
       return res.status(200).json({
         warning: 'DATAJUD_API_KEY não configurada na Vercel. Retornando simulação.',

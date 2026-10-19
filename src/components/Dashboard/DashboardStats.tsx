@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, FileText, AlertTriangle, DollarSign, CheckSquare, BookOpen, TrendingUp, TrendingDown } from 'lucide-react';
+import { Users, FileText, AlertTriangle, DollarSign, BookOpen } from 'lucide-react';
 import { Dashboard } from '../../types';
 
 interface DashboardStatsProps {
@@ -7,20 +7,27 @@ interface DashboardStatsProps {
 }
 
 const DashboardStats: React.FC<DashboardStatsProps> = ({ data }) => {
+  const activeProcesses = data?.activeProcesses ?? 0;
+  const totalProcesses = data?.totalProcesses ?? 0;
+  const clientsCount = data?.clientsCount ?? 0;
+  const overdueTasks = data?.overdueTasks ?? 0;
+  const monthlyRevenue = data?.monthlyRevenue ?? 0;
+  const pendingPublications = data?.pendingPublications ?? 0;
+
   const stats = [
     {
       name: 'Processos Ativos',
-      value: data.activeProcesses,
-      total: data.totalProcesses,
+      value: activeProcesses,
+      total: totalProcesses,
       icon: FileText,
       color: 'bg-blue-500',
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-600',
-      change: data.totalProcesses > 0 ? `${Math.round((data.activeProcesses / data.totalProcesses) * 100)}% ativos` : null,
+      change: totalProcesses > 0 ? `${Math.round((activeProcesses / totalProcesses) * 100)}% ativos` : null,
     },
     {
       name: 'Clientes',
-      value: data.clientsCount,
+      value: clientsCount,
       icon: Users,
       color: 'bg-green-500',
       bgColor: 'bg-green-50',
@@ -29,32 +36,32 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data }) => {
     },
     {
       name: 'Tarefas Vencidas',
-      value: data.overdueTasks,
+      value: overdueTasks,
       icon: AlertTriangle,
       color: 'bg-red-500',
       bgColor: 'bg-red-50',
       textColor: 'text-red-600',
-      change: data.overdueTasks > 0 ? 'Requer atenção' : 'Em dia',
-      changeColor: data.overdueTasks > 0 ? 'text-red-600' : 'text-green-600',
+      change: overdueTasks > 0 ? 'Requer atenção' : 'Em dia',
+      changeColor: overdueTasks > 0 ? 'text-red-600' : 'text-green-600',
     },
     {
       name: 'Receita Mensal',
-      value: `R$ ${data.monthlyRevenue.toLocaleString()}`,
+      value: `R$ ${monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       icon: DollarSign,
       color: 'bg-yellow-500',
       bgColor: 'bg-yellow-50',
       textColor: 'text-yellow-600',
-      change: data.monthlyRevenue > 0 ? 'Mês atual' : 'Sem receitas',
+      change: monthlyRevenue > 0 ? 'Mês atual' : 'Sem receitas',
     },
     {
       name: 'Publicações Pendentes',
-      value: data.pendingPublications,
+      value: pendingPublications,
       icon: BookOpen,
       color: 'bg-purple-500',
       bgColor: 'bg-purple-50',
       textColor: 'text-purple-600',
-      change: data.pendingPublications > 0 ? 'Aguardando ciência' : 'Todas em dia',
-      changeColor: data.pendingPublications > 0 ? 'text-orange-600' : 'text-green-600',
+      change: pendingPublications > 0 ? 'Aguardando ciência' : 'Todas em dia',
+      changeColor: pendingPublications > 0 ? 'text-orange-600' : 'text-green-600',
     },
   ];
 
@@ -72,7 +79,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data }) => {
                 <p className="text-2xl font-semibold text-gray-900">
                   {stat.value}
                 </p>
-                {stat.total && (
+                {Boolean(stat.total) && (
                   <p className="ml-2 text-sm text-gray-500">
                     / {stat.total}
                   </p>

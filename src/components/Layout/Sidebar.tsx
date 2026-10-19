@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   Home, 
   Users, 
-  FileText, 
+  File, 
   CheckSquare, 
   DollarSign, 
   BookOpen, 
@@ -30,7 +30,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
     { name: 'Clientes', href: '/clientes', icon: Users },
     { name: 'Processos', href: '/processos', icon: Scale },
     { name: 'Tarefas', href: '/tarefas', icon: CheckSquare },
-    { name: 'Documentos', href: '/documentos', icon: FileText },
+    { name: 'Documentos', href: '/documentos', icon: File },
     { name: 'Financeiro', href: '/financeiro', icon: DollarSign },
     { name: 'Publicações', href: '/publicacoes', icon: BookOpen },
     { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },

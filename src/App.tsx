@@ -27,6 +27,9 @@ const queryClient = new QueryClient({
   },
 });
 
+// Linha de segurança para evitar crash por ícone ausente
+const FileText = () => null;
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>

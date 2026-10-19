@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Upload, Search, Filter, Eye, Download, Share2, FileText, 
-  Image, File, Folder, Plus, MoreVertical, Calendar, User,
+  Upload, Search, Filter, Eye, Download, Share2, Image, File, Folder, Plus, MoreVertical, Calendar, User,
   Tag, Clock, ChevronRight, Loader2, X
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -138,7 +137,7 @@ const Documents: React.FC = () => {
   };
 
   const getFileIcon = (type: string) => {
-    if (type === 'application/pdf') return FileText;
+    if (type === 'application/pdf') return File;
     if (type.startsWith('image/')) return Image;
     return File;
   };
@@ -381,7 +380,7 @@ const Documents: React.FC = () => {
             {documents.length === 0 && !isLoading && (
               <div className="p-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileText className="h-8 w-8 text-gray-400" />
+                  <File className="h-8 w-8 text-gray-400" />
                 </div>
                 <p className="text-gray-500">Nenhum documento encontrado</p>
                 <p className="text-gray-400 text-sm mt-2">

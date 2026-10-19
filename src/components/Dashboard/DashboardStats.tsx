@@ -1,5 +1,11 @@
 import React from 'react';
-import { Users, FileText, AlertTriangle, DollarSign, BookOpen } from 'lucide-react';
+import { 
+  Users, 
+  FileText, 
+  AlertTriangle, 
+  DollarSign, 
+  BookOpen 
+} from 'lucide-react';
 import { Dashboard } from '../../types';
 
 interface DashboardStatsProps {
@@ -67,33 +73,36 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-      {stats.map((stat, index) => (
-        <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className={`${stat.bgColor} p-3 rounded-lg`}>
-              <stat.icon className={`h-6 w-6 ${stat.textColor}`} />
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-              <div className="flex items-baseline justify-end">
-                <p className="text-2xl font-semibold text-gray-900">
-                  {stat.value}
-                </p>
-                {Boolean(stat.total) && (
-                  <p className="ml-2 text-sm text-gray-500">
-                    / {stat.total}
+      {stats.map((stat, index) => {
+        const IconComponent = stat.icon;
+        return (
+          <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div className={`${stat.bgColor} p-3 rounded-lg`}>
+                <IconComponent className={`h-6 w-6 ${stat.textColor}`} />
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
+                <div className="flex items-baseline justify-end">
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {stat.value}
+                  </p>
+                  {Boolean(stat.total) && (
+                    <p className="ml-2 text-sm text-gray-500">
+                      / {stat.total}
+                    </p>
+                  )}
+                </div>
+                {stat.change && (
+                  <p className={`text-xs mt-1 ${stat.changeColor || 'text-gray-500'}`}>
+                    {stat.change}
                   </p>
                 )}
               </div>
-              {stat.change && (
-                <p className={`text-xs mt-1 ${stat.changeColor || 'text-gray-500'}`}>
-                  {stat.change}
-                </p>
-              )}
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

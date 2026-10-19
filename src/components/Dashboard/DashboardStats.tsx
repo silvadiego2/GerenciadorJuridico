@@ -1,10 +1,10 @@
 import React from 'react';
 import { 
   Users, 
-  FileText, 
   AlertTriangle, 
   DollarSign, 
-  BookOpen 
+  BookOpen,
+  FolderKanban
 } from 'lucide-react';
 import { Dashboard } from '../../types';
 
@@ -25,7 +25,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data }) => {
       name: 'Processos Ativos',
       value: activeProcesses,
       total: totalProcesses,
-      icon: FileText,
+      icon: FolderKanban,
       color: 'bg-blue-500',
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-600',

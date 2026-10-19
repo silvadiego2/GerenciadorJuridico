@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Process, Client, Task } from '../types';
+import { Process, Client, Task, Dashboard } from '../types';
 
 // ==========================================
 // 1. CLIENTES (clientsService)
@@ -470,20 +470,47 @@ export const integrationsService = {
 // 8. DASHBOARD (dashboardService)
 // ==========================================
 export const dashboardService = {
-  async getSummary(): Promise<any> {
-    const [procRes, clientRes, taskRes] = await Promise.all([
-      supabase.from('processes').select('id', { count: 'exact', head: true }),
-      supabase.from('clients').select('id', { count: 'exact', head: true }),
-      supabase.from('tasks').select('id', { count: 'exact', head: true })
-    ]);
+  async getSummary(): Promise<Dashboard> {
+    try {
+      const [procRes, activeRes, clientRes, taskRes] = await Promise.allSettled([
+        supabase.from('processes').select('*', { count: 'exact', head: true }),
+        supabase.from('processes').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
+        supabase.from('clients').select('*', { count: 'exact', head: true }),
+        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'pendente')
+      ]);
 
-    return {
-      totalProcesses: procRes.count || 0,
-      totalClients: clientRes.count || 0,
-      totalTasks: taskRes.count || 0,
-      activeProcesses: procRes.count || 0,
-      pendingTasks: taskRes.count || 0
-    };
+      const totalProcesses = procRes.status === 'fulfilled' ? procRes.value.count ?? 0 : 0;
+      const activeProcesses = activeRes.status === 'fulfilled' ? activeRes.value.count ?? 0 : 0;
+      const clientsCount = clientRes.status === 'fulfilled' ? clientRes.value.count ?? 0 : 0;
+      const overdueTasks = taskRes.status === 'fulfilled' ? taskRes.value.count ?? 0 : 0;
+
+      return {
+        totalProcesses,
+        activeProcesses,
+        clientsCount,
+        overdueTasks,
+        monthlyRevenue: 0,
+        pendingPublications: 0,
+        processesByStatus: [],
+        tasksByPriority: [],
+        revenueByMonth: [],
+        recentActivities: []
+      };
+    } catch (err) {
+      console.warn('Erro ao carregar sumário do dashboard:', err);
+      return {
+        totalProcesses: 0,
+        activeProcesses: 0,
+        clientsCount: 0,
+        overdueTasks: 0,
+        monthlyRevenue: 0,
+        pendingPublications: 0,
+        processesByStatus: [],
+        tasksByPriority: [],
+        revenueByMonth: [],
+        recentActivities: []
+      };
+    }
   },
 
   async getStats(period?: string): Promise<any> {
@@ -528,12 +555,12 @@ export const reportsService = {
     return {
       overview: {
         totalProcesses: summary.totalProcesses,
-        totalClients: summary.totalClients,
-        totalRevenue: 0,
-        totalTasks: summary.totalTasks,
+        totalClients: summary.clientsCount,
+        totalRevenue: summary.monthlyRevenue,
+        totalTasks: summary.overdueTasks,
         completedTasks: 0,
-        overdueTasks: 0,
-        pendingPublications: 0
+        overdueTasks: summary.overdueTasks,
+        pendingPublications: summary.pendingPublications
       },
       processesByStatus: [],
       processesByMonth: [],

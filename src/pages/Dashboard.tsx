@@ -8,7 +8,6 @@ import ProcessChart from '../components/Dashboard/ProcessChart';
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
-  // Query para buscar dados do dashboard
   const { 
     data: dashboardData, 
     isLoading, 
@@ -17,8 +16,8 @@ const Dashboard: React.FC = () => {
   } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: () => dashboardService.getSummary(),
-    staleTime: 2 * 60 * 1000, // 2 minutos
-    refetchInterval: 5 * 60 * 1000, // Atualizar a cada 5 minutos
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const handleRefresh = () => {
@@ -100,17 +99,18 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const data: DashboardType = dashboardData || {
-    totalProcesses: 0,
-    activeProcesses: 0,
-    overdueTasks: 0,
-    pendingPublications: 0,
-    monthlyRevenue: 0,
-    clientsCount: 0,
-    processesByStatus: [],
-    tasksByPriority: [],
-    revenueByMonth: [],
-    recentActivities: []
+  // Normalização profunda: garante que NENHUM campo seja undefined
+  const data: DashboardType = {
+    totalProcesses: dashboardData?.totalProcesses ?? 0,
+    activeProcesses: dashboardData?.activeProcesses ?? 0,
+    overdueTasks: dashboardData?.overdueTasks ?? 0,
+    pendingPublications: dashboardData?.pendingPublications ?? 0,
+    monthlyRevenue: dashboardData?.monthlyRevenue ?? 0,
+    clientsCount: dashboardData?.clientsCount ?? 0,
+    processesByStatus: Array.isArray(dashboardData?.processesByStatus) ? dashboardData.processesByStatus : [],
+    tasksByPriority: Array.isArray(dashboardData?.tasksByPriority) ? dashboardData.tasksByPriority : [],
+    revenueByMonth: Array.isArray(dashboardData?.revenueByMonth) ? dashboardData.revenueByMonth : [],
+    recentActivities: Array.isArray(dashboardData?.recentActivities) ? dashboardData.recentActivities : []
   };
 
   return (

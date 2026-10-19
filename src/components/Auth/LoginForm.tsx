@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuthContext } from '../../contexts/AuthContext';
-import { Scale, Eye, EyeOff, UserPlus } from 'lucide-react';
+import { Scale, Eye, EyeOff, UserPlus, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { authService } from '../../lib/auth';
+import { supabase } from '../../lib/supabaseClient';
 
 const LoginForm: React.FC = () => {
   const { login } = useAuthContext();
@@ -26,14 +26,42 @@ const LoginForm: React.FC = () => {
 
     try {
       if (isRegisterMode) {
-        await authService.register({
-          name,
+        // 1. Cadastra o usuário no Supabase Auth com metadados
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
-          role,
-          oab: oab || undefined,
-          phone: phone || undefined
+          options: {
+            data: {
+              name,
+              role,
+              oab: oab || null,
+              phone: phone || null,
+            },
+          },
         });
+
+        if (authError) throw authError;
+
+        // 2. Insere o registro correspondente na tabela public.users
+        if (authData.user) {
+          const { error: dbError } = await supabase.from('users').insert([
+            {
+              id: authData.user.id,
+              name,
+              email,
+              role,
+              oab: oab || null,
+              phone: phone || null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ]);
+
+          if (dbError) {
+            console.warn('Aviso: falha ao espelhar em public.users:', dbError.message);
+          }
+        }
+
         setSuccessMessage('Conta criada com sucesso! Faça login para continuar.');
         setIsRegisterMode(false);
         setName('');
@@ -43,6 +71,7 @@ const LoginForm: React.FC = () => {
         setPhone('');
         setRole('estagiario');
       } else {
+        // Autentica via AuthContext (Supabase signInWithPassword)
         await login(email, password);
       }
     } catch (err: any) {
@@ -52,18 +81,11 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  const demoAccounts = [
-    { email: 'joao@escritorio.com', role: 'Advogado', password: 'demo123' },
-    { email: 'maria@escritorio.com', role: 'Estagiário', password: 'demo123' },
-    { email: 'admin@escritorio.com', role: 'Administrador', password: 'demo123' },
-    { email: 'cliente@teste.com', role: 'Cliente', password: 'demo123' },
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-white rounded-full flex items-center justify-center">
+          <div className="mx-auto h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-lg">
             <Scale className="h-8 w-8 text-blue-600" />
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-white">
@@ -74,13 +96,17 @@ const LoginForm: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-xl p-8">
+        <div className="bg-white rounded-xl shadow-2xl p-8">
           <div className="mb-6 flex gap-2">
             <button
               type="button"
-              onClick={() => { setIsRegisterMode(false); setError(''); setSuccessMessage(''); }}
+              onClick={() => {
+                setIsRegisterMode(false);
+                setError('');
+                setSuccessMessage('');
+              }}
               className={clsx(
-                'flex-1 py-2 px-4 rounded-md font-medium transition-all',
+                'flex-1 py-2 px-4 rounded-lg font-medium transition-all text-sm',
                 !isRegisterMode
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -90,9 +116,13 @@ const LoginForm: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => { setIsRegisterMode(true); setError(''); setSuccessMessage(''); }}
+              onClick={() => {
+                setIsRegisterMode(true);
+                setError('');
+                setSuccessMessage('');
+              }}
               className={clsx(
-                'flex-1 py-2 px-4 rounded-md font-medium transition-all flex items-center justify-center gap-2',
+                'flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm',
                 isRegisterMode
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -103,7 +133,7 @@ const LoginForm: React.FC = () => {
             </button>
           </div>
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-5" onSubmit={handleSubmit}>
             {isRegisterMode && (
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
@@ -116,7 +146,7 @@ const LoginForm: React.FC = () => {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   placeholder="Seu nome completo"
                 />
               </div>
@@ -134,7 +164,7 @@ const LoginForm: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 placeholder="seu@email.com"
               />
             </div>
@@ -152,7 +182,7 @@ const LoginForm: React.FC = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   placeholder="Sua senha"
                 />
                 <button
@@ -180,7 +210,7 @@ const LoginForm: React.FC = () => {
                     name="role"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   >
                     <option value="estagiario">Estagiário</option>
                     <option value="advogado">Advogado</option>
@@ -200,7 +230,7 @@ const LoginForm: React.FC = () => {
                       type="text"
                       value={oab}
                       onChange={(e) => setOab(e.target.value)}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                       placeholder="BA 12345"
                     />
                   </div>
@@ -216,7 +246,7 @@ const LoginForm: React.FC = () => {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     placeholder="(71) 99999-9999"
                   />
                 </div>
@@ -224,14 +254,16 @@ const LoginForm: React.FC = () => {
             )}
 
             {successMessage && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
-                {successMessage}
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                <span>{successMessage}</span>
               </div>
             )}
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-                {error}
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
@@ -239,46 +271,19 @@ const LoginForm: React.FC = () => {
               type="submit"
               disabled={loading}
               className={clsx(
-                'w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
-                loading && 'opacity-50 cursor-not-allowed'
+                'w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors',
+                loading && 'opacity-60 cursor-not-allowed'
               )}
             >
-              {loading
-                ? isRegisterMode ? 'Criando...' : 'Entrando...'
-                : isRegisterMode ? 'Criar Conta' : 'Entrar'
-              }
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : isRegisterMode ? (
+                'Criar Conta'
+              ) : (
+                'Entrar'
+              )}
             </button>
           </form>
-
-          {!isRegisterMode && (
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Contas de demonstração</span>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {demoAccounts.map((account, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => {
-                    setEmail(account.email);
-                    setPassword(account.password);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md border border-gray-200 transition-colors"
-                >
-                  <div className="font-medium">{account.role}</div>
-                  <div className="text-xs text-gray-500">{account.email}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          )}
         </div>
       </div>
     </div>

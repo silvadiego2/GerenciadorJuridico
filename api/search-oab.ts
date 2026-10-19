@@ -1,5 +1,7 @@
 // api/search-oab.ts
 
+declare const process: any;
+
 export default async function handler(req: any, res: any) {
   // Configuração básica de CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -25,9 +27,9 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const datajudKey = process.env.DATAJUD_API_KEY || '';
+    const datajudKey = (typeof process !== 'undefined' && process.env?.DATAJUD_API_KEY) || '';
 
-    // Se ainda não tiver a chave de produção configurada nas variáveis da Vercel, retorna simulação
+    // Se a chave não estiver configurada, retorna os dados simulados para teste
     if (!datajudKey) {
       return res.status(200).json({
         warning: 'DATAJUD_API_KEY não configurada na Vercel. Retornando simulação.',

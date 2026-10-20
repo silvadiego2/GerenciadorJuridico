@@ -5,17 +5,17 @@ import {
   Search, 
   Key, 
   Building2, 
-  FileText, 
   Copy, 
   Check, 
   AlertCircle, 
   FileSpreadsheet, 
   User, 
   ExternalLink,
-  Gavel,
   Globe,
   Info,
-  X
+  X,
+  ShieldCheck,
+  Gavel
 } from 'lucide-react';
 import { 
   consultarProcessosPorOab, 
@@ -30,37 +30,43 @@ const UFS_BRASIL = [
   'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'
 ];
 
-// Links oficiais de consulta pública gratuita por OAB nos principais tribunais da Bahia e Federais
+// 6 Tribunais balanceados em grade 3x2 (sem deixar buraco em branco na tela)
 const TRIBUNAIS_GRATUITOS = [
   {
     nome: 'TJBA - PJe (1º e 2º Grau)',
     sigla: 'TJBA',
-    descricao: 'Tribunal de Justiça da Bahia - Consulta Processual Pública',
+    descricao: 'Tribunal de Justiça da Bahia — Consulta Pública Processual Oficial',
     url: 'https://pje.tjba.jus.br/pje/ConsultaPublica/listView.seam',
   },
   {
-    nome: 'TJBA - PROJUDI (Juizados Especiais)',
+    nome: 'TJBA - PROJUDI',
     sigla: 'PROJUDI',
-    descricao: 'Juizados Especiais Cíveis e Fazenda Pública da Bahia',
+    descricao: 'Juizados Especiais Cíveis, Consumidor e Fazenda Pública da Bahia',
     url: 'https://projudi.tjba.jus.br/projudi/consulta_publica.do',
   },
   {
-    nome: 'TRF1 - Tribunal Regional Federal 1ª Região (BA)',
+    nome: 'TRF1 - Justiça Federal (BA)',
     sigla: 'TRF1',
-    descricao: 'Justiça Federal da Bahia e Região Norte/Nordeste',
+    descricao: 'Tribunal Regional Federal da 1ª Região (Bahia e Distrito Federal)',
     url: 'https://pje1g.trf1.jus.br/consultapublica/ConsultaPublica/listView.seam',
   },
   {
-    nome: 'TRT5 - Tribunal Regional do Trabalho da Bahia',
+    nome: 'TRT5 - Justiça do Trabalho',
     sigla: 'TRT5',
-    descricao: 'Justiça do Trabalho da Bahia',
+    descricao: 'Tribunal Regional do Trabalho da 5ª Região (Varas da Bahia)',
     url: 'https://pje.trt5.jus.br/consultapublica/ConsultaPublica/listView.seam',
   },
   {
-    nome: 'CNA - Cadastro Nacional dos Advogados (CFOAB)',
-    sigla: 'CNA',
-    descricao: 'Consulta oficial de regularidade do advogado no Conselho Federal',
+    nome: 'CNA - Cadastro Nacional OAB',
+    sigla: 'CFOAB',
+    descricao: 'Consulta oficial de regularidade e cadastro do advogado no Conselho Federal',
     url: 'https://cna.oab.org.br/',
+  },
+  {
+    nome: 'STJ - Tribunais Superiores',
+    sigla: 'STJ',
+    descricao: 'Superior Tribunal de Justiça — Consulta Pública Unificada de Processos',
+    url: 'https://processo.stj.jus.br/processo/pesquisa/',
   },
 ];
 
@@ -90,7 +96,7 @@ export const ConsultaProcessosOAB: React.FC = () => {
     salvarChaveApi(chaveApiInput);
     setPossuiChave(Boolean(chaveApiInput.trim()));
     setModalChaveAberto(false);
-    alert('Chave salva com sucesso no navegador!');
+    alert('Chave de API salva com sucesso no navegador!');
   };
 
   const handlePesquisarAPI = async (e: React.FormEvent) => {
@@ -138,48 +144,55 @@ export const ConsultaProcessosOAB: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Scale className="w-6 h-6 text-blue-600" />
-            Consulta Processual por OAB
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Pesquise processos judiciais reais via API ou consulte gratuitamente pelos portais oficiais dos tribunais.
-          </p>
+    // CONTAINER COM MARGENS E PADDING CORRIGIDOS
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      
+      {/* Cabeçalho da Página com alinhamento refinado */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="bg-blue-600 text-white p-3 rounded-2xl shadow-sm flex-shrink-0">
+            <Scale className="w-7 h-7" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Consulta Processual por OAB
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
+              Pesquise processos judiciais reais via API ou consulte gratuitamente pelos portais oficiais dos tribunais.
+            </p>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={() => setModalChaveAberto(true)}
-          className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition border shadow-xs flex-shrink-0 ${
             possuiChave 
-              ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
-              : 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100'
+              ? 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
+              : 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100 ring-2 ring-amber-300/50'
           }`}
         >
           <Key className="w-4 h-4 text-amber-600" />
-          {possuiChave ? 'Chave de API Configurada' : 'Inserir Chave da API'}
+          {possuiChave ? 'Chave API Configurada' : 'Configurar Chave da API'}
         </button>
       </div>
 
-      {/* Opção 1: Formulário via API */}
-      <form onSubmit={handlePesquisarAPI} className="bg-white border rounded-2xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+      {/* Card 1: Formulário de Pesquisa via API */}
+      <form onSubmit={handlePesquisarAPI} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
             <Search className="w-4 h-4 text-blue-600" />
             Pesquisa Automatizada nos Tribunais (API)
           </span>
-          <span className="text-[11px] text-slate-400">
-            {possuiChave ? 'API pronta para consulta' : 'Requer token gratuito do Escavador'}
+          <span className="text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-medium">
+            {possuiChave ? '✓ Chave conectada' : 'Requer token gratuito do Escavador'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+        {/* Grade de Campos com Alturas Padronizadas (h-11) */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+          <div className="sm:col-span-6">
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
               Número da OAB *
             </label>
             <input
@@ -187,18 +200,18 @@ export const ConsultaProcessosOAB: React.FC = () => {
               placeholder="Ex: 54321 ou 12345"
               value={numeroOab}
               onChange={e => setNumeroOab(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500"
+              className="w-full h-11 px-3.5 border border-slate-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/50 focus:bg-white transition"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <div className="sm:col-span-3">
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
               Seccional (UF) *
             </label>
             <select
               value={ufOab}
               onChange={e => setUfOab(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500"
+              className="w-full h-11 px-3.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium transition"
             >
               {UFS_BRASIL.map(uf => (
                 <option key={uf} value={uf}>
@@ -208,11 +221,11 @@ export const ConsultaProcessosOAB: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex items-end">
+          <div className="sm:col-span-3">
             <button
               type="submit"
               disabled={carregando}
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold rounded-lg transition flex items-center justify-center gap-2 shadow-sm"
+              className="w-full h-11 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
             >
               {carregando ? (
                 <>
@@ -230,50 +243,62 @@ export const ConsultaProcessosOAB: React.FC = () => {
         </div>
 
         {erro && (
-          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl text-xs flex items-center gap-2">
+          <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl text-xs flex items-center gap-2.5">
             <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
             <span>{erro}</span>
           </div>
         )}
       </form>
 
-      {/* Opção 2: Links Oficiais Gratuitos nos Tribunais */}
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Globe className="w-5 h-5 text-emerald-600" />
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">
-              Consulta Gratuita Direta nos Tribunais (Sem Custo de API)
-            </h3>
-            <p className="text-[11px] text-slate-500">
-              Se não quiser utilizar créditos de API, acesse a consulta pública oficial e gratuita dos tribunais:
-            </p>
+      {/* Card 2: Consulta Gratuita Direta nos Tribunais (6 cards equilibrados) */}
+      <div className="bg-slate-50/90 border border-slate-200 rounded-2xl p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+          <div className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-emerald-600" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                Consulta Gratuita Direta nos Tribunais (Sem Custo de API)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Acesse a consulta pública oficial e gratuita dos tribunais sem consumir créditos:
+              </p>
+            </div>
           </div>
+          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full self-start sm:self-auto">
+            100% Gratuito & Ilimitado
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+        {/* Grade 3x2 no desktop (perfeitamente preenchida) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
           {TRIBUNAIS_GRATUITOS.map((tribunal, idx) => (
             <a
               key={idx}
               href={tribunal.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-3 bg-white border border-slate-200 hover:border-blue-400 rounded-xl transition flex flex-col justify-between group shadow-2xs"
+              className="p-4 bg-white border border-slate-200 hover:border-blue-500 hover:shadow-md rounded-2xl transition-all flex flex-col justify-between group shadow-xs"
             >
               <div>
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 group-hover:text-blue-600">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-bold text-xs text-slate-900 group-hover:text-blue-600 transition-colors">
                     {tribunal.nome}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 flex-shrink-0 transition-colors mt-0.5" />
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
                   {tribunal.descricao}
                 </p>
               </div>
-              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded self-start mt-2">
-                100% Gratuito
-              </span>
+
+              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold text-slate-400">
+                  {tribunal.sigla}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                  Acesso Oficial
+                </span>
+              </div>
             </a>
           ))}
         </div>
@@ -281,7 +306,7 @@ export const ConsultaProcessosOAB: React.FC = () => {
 
       {/* Resultados da Pesquisa por API (caso pesquisado) */}
       {advogado && (
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <User className="w-5 h-5 text-blue-400" />
@@ -291,53 +316,62 @@ export const ConsultaProcessosOAB: React.FC = () => {
               Inscrição: OAB/{advogado.oab.uf} nº {advogado.oab.numero}
             </p>
           </div>
-          <div className="bg-white/10 px-4 py-2 rounded-xl text-center">
-            <span className="text-[10px] text-slate-300 block uppercase">Processos Localizados</span>
-            <span className="text-lg font-bold text-white">{advogado.quantidade_processos}</span>
+          <div className="bg-white/10 px-5 py-2.5 rounded-xl text-center">
+            <span className="text-[10px] text-slate-300 block uppercase font-medium">Processos Localizados</span>
+            <span className="text-xl font-bold text-white">{advogado.quantidade_processos}</span>
           </div>
         </div>
       )}
 
-      {/* Lista de processos retornados */}
+      {/* Lista de Processos retornados da API */}
       {processos.length > 0 && (
-        <div className="space-y-3">
-          <input
-            type="text"
-            placeholder="Filtrar por número CNJ, autor ou réu..."
-            value={buscaInterna}
-            onChange={e => setBuscaInterna(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500"
-          />
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Filtrar processos por número CNJ, autor ou réu..."
+              value={buscaInterna}
+              onChange={e => setBuscaInterna(e.target.value)}
+              className="w-full h-11 pl-10 pr-4 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 shadow-xs"
+            />
+          </div>
 
           <div className="space-y-3">
             {processosFiltrados.map((proc, idx) => (
               <div 
                 key={idx}
-                className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-blue-400 transition space-y-2 text-xs"
+                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:border-blue-400 hover:shadow-md transition space-y-3"
               >
-                <div className="flex items-center justify-between border-b pb-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono font-bold text-sm text-slate-900">{proc.numero_cnj}</span>
                     <button
                       type="button"
                       onClick={() => handleCopiarCnj(proc.numero_cnj)}
-                      className="p-1 text-slate-400 hover:text-blue-600 transition"
+                      className="p-1 text-slate-400 hover:text-blue-600 rounded transition"
                       title="Copiar CNJ"
                     >
                       {cnjCopiado === proc.numero_cnj ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
                       {proc.fontes[0]?.sigla || 'TJ'}
                     </span>
                   </div>
-                  <span className="text-slate-400 text-[11px]">
-                    {proc.data_inicio ? proc.data_inicio.split('-').reverse().join('/') : ''}
+                  <span className="text-slate-500 text-xs font-mono">
+                    {proc.data_inicio ? `Distribuído em: ${proc.data_inicio.split('-').reverse().join('/')}` : ''}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
-                  <div><strong>Autor:</strong> {proc.titulo_polo_ativo || '-'}</div>
-                  <div><strong>Réu:</strong> {proc.titulo_polo_passivo || '-'}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <strong className="text-slate-500 block text-[10px] uppercase">Autor / Polo Ativo:</strong>
+                    <span className="text-slate-800 font-semibold">{proc.titulo_polo_ativo || '-'}</span>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <strong className="text-slate-500 block text-[10px] uppercase">Réu / Polo Passivo:</strong>
+                    <span className="text-slate-800 font-semibold">{proc.titulo_polo_passivo || '-'}</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -345,7 +379,7 @@ export const ConsultaProcessosOAB: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Configuração de Chave da API */}
+      {/* Modal de Configuração de Chave API */}
       {modalChaveAberto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
@@ -366,11 +400,11 @@ export const ConsultaProcessosOAB: React.FC = () => {
             <div className="p-3 bg-blue-50 text-blue-900 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
               <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
               <span>
-                Você pode criar uma conta gratuita no <strong>[api.escavador.com](https://api.escavador.com)</strong> para receber créditos gratuitos de teste e gerar o seu token no menu <em>Tokens de Acesso</em>.
+                Crie uma conta gratuita em <strong>[api.escavador.com](https://api.escavador.com)</strong> para receber créditos de teste e gerar seu token no menu <em>Tokens de Acesso</em>.
               </span>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700">
                 Personal Access Token (Bearer):
               </label>
@@ -379,22 +413,22 @@ export const ConsultaProcessosOAB: React.FC = () => {
                 placeholder="Cole o token do Escavador aqui..."
                 value={chaveApiInput}
                 onChange={e => setChaveApiInput(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t">
+            <div className="flex justify-end gap-2 pt-3 border-t">
               <button
                 type="button"
                 onClick={() => setModalChaveAberto(false)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                className="px-4 py-2 border rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
               >
                 Fechar
               </button>
               <button
                 type="button"
                 onClick={handleSalvarChave}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm"
               >
                 Salvar Chave
               </button>

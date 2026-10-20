@@ -11,12 +11,10 @@ import {
   BarChart3, 
   Settings,
   Scale,
-  Bell,
   LogOut,
   Link,
   UserPlus,
-  Search,
-  Clock
+  Search
 } from 'lucide-react';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { clsx } from 'clsx';
@@ -33,7 +31,6 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
     { name: 'Clientes', href: '/clientes', icon: Users },
     { name: 'Processos', href: '/processos', icon: Scale },
     { name: 'Consulta OAB', href: '/consulta-oab', icon: Search },
-    { name: 'Comunicação Externa', href: '/comunicacao-externa', icon: Clock },
     { name: 'Tarefas', href: '/tarefas', icon: CheckSquare },
     { name: 'Documentos', href: '/documentos', icon: File },
     { name: 'Financeiro', href: '/financeiro', icon: DollarSign },

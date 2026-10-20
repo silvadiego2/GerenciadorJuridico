@@ -1,3 +1,4 @@
+// src/App.tsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -6,6 +7,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import NotificationContainer from './components/Layout/NotificationContainer';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout/Layout';
+
+// Páginas existentes
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Processes from './pages/Processes';
@@ -17,6 +20,10 @@ import Financial from './pages/Financial';
 import Publications from './pages/Publications';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+
+// Novos módulos integrados
+import { ConsultaProcessosOAB } from './components/ConsultaProcessosOAB';
+import { PainelComunicacaoExterna } from './components/PainelComunicacaoExterna';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,30 +44,45 @@ function App() {
         <Router>
           <NotificationContainer />
           <Routes>
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
               <Route index element={<Dashboard />} />
               <Route path="clientes" element={<Clients />} />
               <Route path="processos" element={<Processes />} />
               <Route path="tarefas" element={<Tasks />} />
+              
+              {/* Rotas dos novos módulos */}
+              <Route path="consulta-oab" element={<ConsultaProcessosOAB />} />
+              <Route path="comunicacao-externa" element={<PainelComunicacaoExterna />} />
+              
               <Route path="integracoes" element={<Integrations />} />
               <Route path="documentos" element={<Documents />} />
               <Route path="financeiro" element={<Financial />} />
               <Route path="publicacoes" element={<Publications />} />
               <Route path="relatorios" element={<Reports />} />
-              <Route path="configuracoes" element={
-                <ProtectedRoute requiredRoles={['admin']}>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              <Route path="usuarios" element={
-                <ProtectedRoute requiredRoles={['admin']}>
-                  <Users />
-                </ProtectedRoute>
-              } />
+              
+              <Route
+                path="configuracoes"
+                element={
+                  <ProtectedRoute requiredRoles={['admin']}>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="usuarios"
+                element={
+                  <ProtectedRoute requiredRoles={['admin']}>
+                    <Users />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
           </Routes>
         </Router>

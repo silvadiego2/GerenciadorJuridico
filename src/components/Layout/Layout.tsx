@@ -1,3 +1,4 @@
+// src/components/Layout/Layout.tsx
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
@@ -11,12 +12,19 @@ const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {/* Menu Lateral */}
       <Sidebar collapsed={sidebarCollapsed} />
-      <div className="flex-1 flex flex-col overflow-hidden">
+
+      {/* Conteúdo Principal */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header onToggleSidebar={toggleSidebar} />
-        <main className="flex-1 overflow-auto">
-          <Outlet />
+
+        {/* Área de visualização das páginas com margens e respiro padronizados */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

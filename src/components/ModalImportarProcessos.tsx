@@ -12,7 +12,7 @@ import {
   Gavel,
   ShieldCheck
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabaseClient';
 import { useAuthContext } from '../contexts/AuthContext';
 
 interface ProcessoImportado {

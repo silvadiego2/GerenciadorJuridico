@@ -8,7 +8,7 @@ import NotificationContainer from './components/Layout/NotificationContainer';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout/Layout';
 
-// Páginas existentes
+// Páginas do Gerenciador Jurídico
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Processes from './pages/Processes';
@@ -21,14 +21,13 @@ import Publications from './pages/Publications';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 
-// Novos módulos integrados
+// Módulo de Consulta Processual por OAB
 import { ConsultaProcessosOAB } from './components/ConsultaProcessosOAB';
-import { PainelComunicacaoExterna } from './components/PainelComunicacaoExterna';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000,
       retry: 1,
     },
   },
@@ -55,12 +54,11 @@ function App() {
               <Route index element={<Dashboard />} />
               <Route path="clientes" element={<Clients />} />
               <Route path="processos" element={<Processes />} />
-              <Route path="tarefas" element={<Tasks />} />
               
-              {/* Rotas dos novos módulos */}
+              {/* Rota da Consulta por OAB */}
               <Route path="consulta-oab" element={<ConsultaProcessosOAB />} />
-              <Route path="comunicacao-externa" element={<PainelComunicacaoExterna />} />
               
+              <Route path="tarefas" element={<Tasks />} />
               <Route path="integracoes" element={<Integrations />} />
               <Route path="documentos" element={<Documents />} />
               <Route path="financeiro" element={<Financial />} />

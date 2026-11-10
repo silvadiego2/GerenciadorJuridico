@@ -630,3 +630,78 @@ export const reportsService = {
     return new Blob(['Relatório gerado em PDF'], { type: 'application/pdf' });
   }
 };
+
+// Adicionar ao usersService:
+export const usersService = {
+  // ... métodos existentes getAll, getById, update, delete ...
+
+  async create(data: any): Promise<any> {
+    const payload = {
+      name: data.name,
+      email: data.email,
+      role: data.role || 'advogado',
+      oab: data.oab || null,
+      phone: data.phone || null,
+      status: data.status || 'ativo',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const { data: created, error } = await supabase.from('users').insert([payload]).select().single();
+    if (error) throw new Error(error.message);
+    return created;
+  }
+};
+
+// ==========================================
+// 11. CONFIGURAÇÕES DE PRAZOS (deadlineSettingsService)
+// ==========================================
+export const deadlineSettingsService = {
+  async getSettings() {
+    try {
+      const { data, error } = await supabase
+        .from('deadline_settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data || {
+        default_warning_days: 3,
+        count_business_days: true,
+        notify_email: true,
+        notify_whatsapp: false
+      };
+    } catch (err: any) {
+      console.warn('Aviso deadlineSettingsService.getSettings:', err.message);
+      return {
+        default_warning_days: 3,
+        count_business_days: true,
+        notify_email: true,
+        notify_whatsapp: false
+      };
+    }
+  },
+
+  async updateSettings(settingsData: any) {
+    const { data: existing } = await supabase.from('deadline_settings').select('id').limit(1).maybeSingle();
+    
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from('deadline_settings')
+        .update({ ...settingsData, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('deadline_settings')
+        .insert([{ ...settingsData, updated_at: new Date().toISOString() }])
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    }
+  }
+};

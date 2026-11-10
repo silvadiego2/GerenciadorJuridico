@@ -6,37 +6,42 @@ import { Process, Client, Task, Dashboard } from '../types';
 // ==========================================
 export const clientsService = {
   async getAll(params?: Record<string, string>): Promise<{ clients: Client[]; total: number }> {
-    let query = supabase
-      .from('clients')
-      .select('*', { count: 'exact' });
+    try {
+      let query = supabase
+        .from('clients')
+        .select('*', { count: 'exact' });
 
-    if (params?.search) {
-      query = query.or(`name.ilike.%${params.search}%,email.ilike.%${params.search}%,document.ilike.%${params.search}%`);
+      if (params?.search) {
+        query = query.or(`name.ilike.%${params.search}%,email.ilike.%${params.search}%,document.ilike.%${params.search}%`);
+      }
+
+      if (params?.type && params.type !== 'all') {
+        query = query.eq('type', params.type);
+      }
+
+      query = query.order('name', { ascending: true });
+
+      const { data, count, error } = await query;
+      if (error) throw new Error(error.message);
+
+      const clients: Client[] = (data || []).map((c: any) => ({
+        id: c.id,
+        name: c.name || 'Cliente Sem Nome',
+        email: c.email || '',
+        phone: c.phone || '',
+        document: c.document || '',
+        type: c.type || 'individual',
+        address: c.address,
+        notes: c.notes,
+        createdAt: c.created_at,
+        updatedAt: c.updated_at || c.created_at,
+      }));
+
+      return { clients, total: count || clients.length };
+    } catch (err: any) {
+      console.warn('Erro ao carregar clientes:', err.message);
+      return { clients: [], total: 0 };
     }
-
-    if (params?.type && params.type !== 'all') {
-      query = query.eq('type', params.type);
-    }
-
-    query = query.order('name', { ascending: true });
-
-    const { data, count, error } = await query;
-    if (error) throw new Error(error.message);
-
-    const clients: Client[] = (data || []).map((c: any) => ({
-      id: c.id,
-      name: c.name,
-      email: c.email,
-      phone: c.phone,
-      document: c.document,
-      type: c.type || 'individual',
-      address: c.address,
-      notes: c.notes,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at || c.created_at,
-    }));
-
-    return { clients, total: count || clients.length };
   },
 
   async getById(id: string): Promise<Client> {
@@ -105,39 +110,44 @@ export const clientsService = {
 // ==========================================
 export const processesService = {
   async getAll(params?: { search?: string; status?: string }): Promise<{ processes: Process[]; total: number }> {
-    let query = supabase
-      .from('processes')
-      .select('*, client:clients(id, name, email, phone)', { count: 'exact' });
+    try {
+      let query = supabase
+        .from('processes')
+        .select('*, client:clients(id, name, email, phone)', { count: 'exact' });
 
-    if (params?.status && params.status !== 'all') {
-      query = query.eq('status', params.status);
+      if (params?.status && params.status !== 'all') {
+        query = query.eq('status', params.status);
+      }
+
+      if (params?.search) {
+        query = query.or(`number.ilike.%${params.search}%,subject.ilike.%${params.search}%,title.ilike.%${params.search}%`);
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, count, error } = await query;
+      if (error) throw new Error(error.message);
+
+      const processes: Process[] = (data || []).map((p: any) => ({
+        id: p.id,
+        number: p.number,
+        subject: p.subject || p.title || 'Sem assunto',
+        status: p.status || 'ativo',
+        phase: p.phase || 'conhecimento',
+        court: p.court || '',
+        class: p.class || '',
+        value: Number(p.value) || 0,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at || p.created_at,
+        client: p.client || null,
+        clientId: p.client_id || null,
+      }));
+
+      return { processes, total: count || processes.length };
+    } catch (err: any) {
+      console.warn('Erro ao carregar processos:', err.message);
+      return { processes: [], total: 0 };
     }
-
-    if (params?.search) {
-      query = query.or(`number.ilike.%${params.search}%,subject.ilike.%${params.search}%,title.ilike.%${params.search}%`);
-    }
-
-    query = query.order('created_at', { ascending: false });
-
-    const { data, count, error } = await query;
-    if (error) throw new Error(error.message);
-
-    const processes: Process[] = (data || []).map((p: any) => ({
-      id: p.id,
-      number: p.number,
-      subject: p.subject || p.title || 'Sem assunto',
-      status: p.status || 'ativo',
-      phase: p.phase || 'conhecimento',
-      court: p.court || '',
-      class: p.class || '',
-      value: p.value || 0,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at || p.created_at,
-      client: p.client || null,
-      clientId: p.client_id || null,
-    }));
-
-    return { processes, total: count || processes.length };
   },
 
   async getById(id: string): Promise<Process> {
@@ -215,39 +225,44 @@ export const processesService = {
 // ==========================================
 export const tasksService = {
   async getAll(params?: Record<string, string>): Promise<{ tasks: Task[]; total: number }> {
-    let query = supabase
-      .from('tasks')
-      .select('*, process:processes(id, number, title), assigned_user:users(id, name)', { count: 'exact' });
+    try {
+      let query = supabase
+        .from('tasks')
+        .select('*, process:processes(id, number, title), assigned_user:users(id, name)', { count: 'exact' });
 
-    if (params?.status && params.status !== 'all') {
-      query = query.eq('status', params.status);
+      if (params?.status && params.status !== 'all') {
+        query = query.eq('status', params.status);
+      }
+
+      if (params?.priority && params.priority !== 'all') {
+        query = query.eq('priority', params.priority);
+      }
+
+      query = query.order('due_date', { ascending: true });
+
+      const { data, count, error } = await query;
+      if (error) throw new Error(error.message);
+
+      const tasks: Task[] = (data || []).map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: t.priority,
+        dueDate: t.due_date,
+        processId: t.process_id,
+        assignedTo: t.assigned_to,
+        createdAt: t.created_at,
+        updatedAt: t.updated_at || t.created_at,
+        process: t.process || null,
+        assignedUser: t.assigned_user || null,
+      }));
+
+      return { tasks, total: count || tasks.length };
+    } catch (err: any) {
+      console.warn('Erro ao carregar tarefas:', err.message);
+      return { tasks: [], total: 0 };
     }
-
-    if (params?.priority && params.priority !== 'all') {
-      query = query.eq('priority', params.priority);
-    }
-
-    query = query.order('due_date', { ascending: true });
-
-    const { data, count, error } = await query;
-    if (error) throw new Error(error.message);
-
-    const tasks: Task[] = (data || []).map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      status: t.status,
-      priority: t.priority,
-      dueDate: t.due_date,
-      processId: t.process_id,
-      assignedTo: t.assigned_to,
-      createdAt: t.created_at,
-      updatedAt: t.updated_at || t.created_at,
-      process: t.process || null,
-      assignedUser: t.assigned_user || null,
-    }));
-
-    return { tasks, total: count || tasks.length };
   },
 
   async create(data: any): Promise<Task> {
@@ -305,13 +320,18 @@ export const tasksService = {
 // ==========================================
 export const documentsService = {
   async getAll(params?: Record<string, string>): Promise<{ documents: any[] }> {
-    let query = supabase.from('documents').select('*');
-    if (params?.processId) {
-      query = query.eq('process_id', params.processId);
+    try {
+      let query = supabase.from('documents').select('*');
+      if (params?.processId) {
+        query = query.eq('process_id', params.processId);
+      }
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return { documents: Array.isArray(data) ? data : [] };
+    } catch (err: any) {
+      console.warn('Erro ao carregar documentos:', err.message);
+      return { documents: [] };
     }
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) throw new Error(error.message);
-    return { documents: data || [] };
   },
 
   async getById(id: string): Promise<any> {
@@ -343,36 +363,52 @@ export const documentsService = {
 // ==========================================
 export const financialService = {
   async getAll(params?: Record<string, string>): Promise<{ entries: any[] }> {
-    let query = supabase.from('financial_entries').select('*');
-    if (params?.type && params.type !== 'all') {
-      query = query.eq('type', params.type);
+    try {
+      let query = supabase.from('financial_entries').select('*');
+      if (params?.type && params.type !== 'all') {
+        query = query.eq('type', params.type);
+      }
+      const { data, error } = await query.order('due_date', { ascending: false });
+      if (error) throw new Error(error.message);
+      return { entries: Array.isArray(data) ? data : [] };
+    } catch (err: any) {
+      console.warn('Erro ao carregar lançamentos financeiros:', err.message);
+      return { entries: [] };
     }
-    const { data, error } = await query.order('due_date', { ascending: false });
-    if (error) throw new Error(error.message);
-    return { entries: data || [] };
   },
 
   async getSummary(): Promise<any> {
-    const { data, error } = await supabase.from('financial_entries').select('type, amount, status');
-    if (error) throw new Error(error.message);
+    try {
+      const { data, error } = await supabase.from('financial_entries').select('type, amount, status');
+      if (error) throw new Error(error.message);
 
-    const entries = data || [];
-    let totalReceitas = 0;
-    let totalDespesas = 0;
+      const entries = Array.isArray(data) ? data : [];
+      let totalReceitas = 0;
+      let totalDespesas = 0;
 
-    entries.forEach((e: any) => {
-      const val = Number(e.amount) || 0;
-      if (e.type === 'income') totalReceitas += val;
-      if (e.type === 'expense') totalDespesas += val;
-    });
+      entries.forEach((e: any) => {
+        const val = Number(e.amount) || 0;
+        if (e.type === 'income') totalReceitas += val;
+        if (e.type === 'expense') totalDespesas += val;
+      });
 
-    return {
-      totalReceitas,
-      totalDespesas,
-      saldoLiquido: totalReceitas - totalDespesas,
-      honorariosPendentes: 0,
-      despesasVencidas: 0
-    };
+      return {
+        totalReceitas,
+        totalDespesas,
+        saldoLiquido: totalReceitas - totalDespesas,
+        honorariosPendentes: 0,
+        despesasVencidas: 0
+      };
+    } catch (err: any) {
+      console.warn('Erro ao carregar resumo financeiro:', err.message);
+      return {
+        totalReceitas: 0,
+        totalDespesas: 0,
+        saldoLiquido: 0,
+        honorariosPendentes: 0,
+        despesasVencidas: 0
+      };
+    }
   },
 
   async create(data: any): Promise<any> {
@@ -398,12 +434,17 @@ export const financialService = {
 // ==========================================
 export const publicationsService = {
   async getAll(params?: Record<string, string>): Promise<{ publications: any[] }> {
-    const { data, error } = await supabase
-      .from('publications')
-      .select('*')
-      .order('publication_date', { ascending: false });
-    if (error) throw new Error(error.message);
-    return { publications: data || [] };
+    try {
+      const { data, error } = await supabase
+        .from('publications')
+        .select('*')
+        .order('publication_date', { ascending: false });
+      if (error) throw new Error(error.message);
+      return { publications: Array.isArray(data) ? data : [] };
+    } catch (err: any) {
+      console.warn('Erro ao carregar publicações:', err.message);
+      return { publications: [] };
+    }
   },
 
   async acknowledge(id: string): Promise<any> {
@@ -453,8 +494,12 @@ export const integrationsService = {
   },
 
   async getConfigs() {
-    const { data } = await supabase.from('settings').select('*').eq('key', 'integrations').single();
-    return data?.value || {};
+    try {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'integrations').single();
+      return data?.value || {};
+    } catch {
+      return {};
+    }
   },
 
   async saveConfig(data: any) {
@@ -519,13 +564,21 @@ export const dashboardService = {
 };
 
 // ==========================================
-// 9. UTILIZADORES (usersService)
+// 9. UTILIZADORES (usersService - Blindado)
 // ==========================================
 export const usersService = {
   async getAll(): Promise<{ users: any[] }> {
-    const { data, error } = await supabase.from('users').select('*').order('name');
-    if (error) throw new Error(error.message);
-    return { users: data || [] };
+    try {
+      const { data, error } = await supabase.from('users').select('*').order('name');
+      if (error) {
+        console.warn('Aviso usersService.getAll:', error.message);
+        return { users: [] };
+      }
+      return { users: Array.isArray(data) ? data : [] };
+    } catch (err: any) {
+      console.warn('Exceção usersService.getAll:', err.message);
+      return { users: [] };
+    }
   },
 
   async getById(id: string): Promise<any> {

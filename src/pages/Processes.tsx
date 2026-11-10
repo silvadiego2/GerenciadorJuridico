@@ -160,15 +160,23 @@ const Processes: React.FC = () => {
   };
 
   const formatNullableDate = (dateVal?: string | Date) => {
-    if (!dateVal) return '-';
-    try {
-      const d = new Date(dateVal);
-      if (isNaN(d.getTime())) return '-';
-      return format(d, "dd/MM/yyyy", { locale: ptBR });
-    } catch {
-      return '-';
+  if (!dateVal) return '-';
+  try {
+    // Se a data vier no formato 'YYYY-MM-DD' do banco de dados (campo DATE)
+    if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+      const [year, month, day] = dateVal.split('-');
+      return `${day}/${month}/${year}`;
     }
-  };
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '-';
+    // Adiciona o offset de fuso horário caso venha em UTC com hora zero
+    const userOffset = d.getTimezoneOffset() * 60000;
+    const adjustedDate = new Date(d.getTime() + userOffset);
+    return format(adjustedDate, "dd/MM/yyyy", { locale: ptBR });
+  } catch {
+    return '-';
+  }
+};
 
   if (queryError) {
     return (

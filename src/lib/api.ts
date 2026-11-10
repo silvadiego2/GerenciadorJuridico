@@ -564,7 +564,7 @@ export const dashboardService = {
 };
 
 // ==========================================
-// 9. UTILIZADORES (usersService - Blindado)
+// 9. USUÁRIOS (usersService - Declarado apenas UMA vez)
 // ==========================================
 export const usersService = {
   async getAll(): Promise<{ users: any[] }> {
@@ -585,6 +585,22 @@ export const usersService = {
     const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
     if (error) throw new Error(error.message);
     return data;
+  },
+
+  async create(data: any): Promise<any> {
+    const payload = {
+      name: data.name,
+      email: data.email,
+      role: data.role || 'advogado',
+      oab: data.oab || null,
+      phone: data.phone || null,
+      status: data.status || 'ativo',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const { data: created, error } = await supabase.from('users').insert([payload]).select().single();
+    if (error) throw new Error(error.message);
+    return created;
   },
 
   async update(id: string, data: any): Promise<any> {
@@ -631,27 +647,6 @@ export const reportsService = {
   }
 };
 
-// Adicionar ao usersService:
-export const usersService = {
-  // ... métodos existentes getAll, getById, update, delete ...
-
-  async create(data: any): Promise<any> {
-    const payload = {
-      name: data.name,
-      email: data.email,
-      role: data.role || 'advogado',
-      oab: data.oab || null,
-      phone: data.phone || null,
-      status: data.status || 'ativo',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    const { data: created, error } = await supabase.from('users').insert([payload]).select().single();
-    if (error) throw new Error(error.message);
-    return created;
-  }
-};
-
 // ==========================================
 // 11. CONFIGURAÇÕES DE PRAZOS (deadlineSettingsService)
 // ==========================================
@@ -692,7 +687,7 @@ export const deadlineSettingsService = {
         .eq('id', existing.id)
         .select()
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       return data;
     } else {
       const { data, error } = await supabase

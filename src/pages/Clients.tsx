@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Phone, Mail, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Phone, Mail, Trash2, Loader2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '../lib/api';
 import { Client } from '../types';
@@ -26,10 +26,10 @@ const Clients: React.FC = () => {
       type: selectedType !== 'all' ? selectedType : undefined,
       status: selectedStatus !== 'all' ? selectedStatus : undefined,
     }),
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 5 * 60 * 1000,
   });
 
-  const clients = clientsData?.clients || [];
+  const clients = Array.isArray(clientsData?.clients) ? clientsData.clients : [];
 
   // Mutation para criar cliente
   const createClientMutation = useMutation({
@@ -81,8 +81,9 @@ const Clients: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDeleteClient = (clientId: string, clientName: string) => {
-    if (window.confirm(`Tem certeza que deseja excluir o cliente "${clientName}"?`)) {
+  const handleDeleteClient = (clientId: string, clientName?: string) => {
+    const nomeExibicao = clientName || 'este cliente';
+    if (window.confirm(`Tem certeza que deseja excluir o cliente "${nomeExibicao}"?`)) {
       deleteClientMutation.mutate(clientId);
     }
   };
@@ -92,6 +93,17 @@ const Clients: React.FC = () => {
       updateClientMutation.mutate({ id: editingClient.id, data: clientData });
     } else {
       createClientMutation.mutate(clientData);
+    }
+  };
+
+  const formatClientDate = (dateValue?: string | Date) => {
+    if (!dateValue) return 'Não informada';
+    try {
+      const parsedDate = new Date(dateValue);
+      if (isNaN(parsedDate.getTime())) return 'Não informada';
+      return format(parsedDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
+    } catch {
+      return 'Não informada';
     }
   };
 
@@ -173,91 +185,99 @@ const Clients: React.FC = () => {
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {clients.map((client) => (
-            <div key={client.id} className="p-6 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600 font-semibold text-lg">
-                      {client.name.charAt(0)}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{client.name}</h3>
-                    <div className="flex items-center space-x-4 mt-1">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        client.type === 'fisica' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {client.type === 'fisica' ? 'Pessoa Física' : 'Pessoa Jurídica'}
-                      </span>
-                      {client.document && <span className="text-sm text-gray-600">{client.document}</span>}
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        client.status === 'ativo' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
-                      </span>
+            {clients.map((client) => {
+              const displayName = client?.name || 'Cliente Sem Nome';
+              const initialLetter = displayName.trim().charAt(0).toUpperCase() || 'C';
+              const rawStatus = (client?.status as string) || 'ativo';
+              const statusDisplay = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
+
+              return (
+                <div key={client.id} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-semibold text-lg">
+                          {initialLetter}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">{displayName}</h3>
+                        <div className="flex items-center space-x-4 mt-1">
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            client?.type === 'fisica' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {client?.type === 'fisica' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                          </span>
+                          {client?.document && <span className="text-sm text-gray-600">{client.document}</span>}
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            rawStatus === 'ativo' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {statusDisplay}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right text-sm text-gray-600 hidden sm:block">
+                        {client?.email && (
+                          <div className="flex items-center space-x-1">
+                            <Mail className="h-4 w-4" />
+                            <span>{client.email}</span>
+                          </div>
+                        )}
+                        {client?.phone && (
+                          <div className="flex items-center space-x-1 mt-1">
+                            <Phone className="h-4 w-4" />
+                            <span>{client.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleEditClient(client)}
+                          className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteClient(client.id, client.name)}
+                          disabled={deleteClientMutation.isPending}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {deleteClientMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center space-x-4">
-                  <div className="text-right text-sm text-gray-600 hidden sm:block">
-                    {client.email && (
-                      <div className="flex items-center space-x-1">
-                        <Mail className="h-4 w-4" />
-                        <span>{client.email}</span>
-                      </div>
-                    )}
-                    {client.phone && (
-                      <div className="flex items-center space-x-1 mt-1">
-                        <Phone className="h-4 w-4" />
-                        <span>{client.phone}</span>
-                      </div>
-                    )}
-                  </div>
                   
-                  <div className="flex items-center space-x-2">
-                    <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleEditClient(client)}
-                      className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteClient(client.id, client.name)}
-                      disabled={deleteClientMutation.isPending}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {deleteClientMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </button>
+                  <div className="mt-4 text-sm text-gray-600">
+                    {client?.address && (
+                      <p>
+                        <strong>Endereço:</strong> {client.address.street || ''}{client.address.number ? `, ${client.address.number}` : ''}
+                        {client.address.complement && `, ${client.address.complement}`}
+                        {(client.address.neighborhood || client.address.city) && ` - ${client.address.neighborhood || ''}, ${client.address.city || ''}/${client.address.state || ''}`}
+                      </p>
+                    )}
+                    <p className="mt-1">
+                      <strong>Cadastrado em:</strong> {formatClientDate(client?.createdAt)}
+                    </p>
                   </div>
                 </div>
-              </div>
-              
-              <div className="mt-4 text-sm text-gray-600">
-                {client.address && (
-                  <p>
-                    <strong>Endereço:</strong> {client.address.street}, {client.address.number}
-                    {client.address.complement && `, ${client.address.complement}`} - {client.address.neighborhood}, {client.address.city}/{client.address.state}
-                  </p>
-                )}
-                <p className="mt-1">
-                  <strong>Cadastrado em:</strong> {format(client.createdAt, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                </p>
-              </div>
-            </div>
-            ))}
+              );
+            })}
           
             {clients.length === 0 && (
               <div className="p-12 text-center">

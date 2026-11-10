@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Scale, User, FileText, Building, MapPin, DollarSign } from 'lucide-react';
+import { X, Scale, User, FileText, Building, MapPin, DollarSign, Calendar } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Process, Client } from '../../types';
 import { clientsService } from '../../lib/api';
@@ -11,19 +11,22 @@ interface ProcessModalProps {
   isLoading: boolean;
 }
 
-const [formData, setFormData] = useState({
-  number: process?.number || '',
-  subject: process?.subject || '',
-  court: process?.court || '',
-  class: process?.class || '',
-  phase: process?.phase || 'conhecimento',
-  status: process?.status || 'ativo',
-  value: process?.value || 0,
-  clientId: process?.clientId || '',
-  plaintiff: (process as any)?.plaintiff || '',
-  defendant: (process as any)?.defendant || '',
-  distributionDate: (process as any)?.distributionDate || (process as any)?.distribution_date || '',
-});
+const ProcessModal: React.FC<ProcessModalProps> = ({ process, onSave, onClose, isLoading }) => {
+  const [formData, setFormData] = useState({
+    number: '',
+    cnj: '',
+    subject: '',
+    court: '',
+    comarca: '',
+    class: '',
+    phase: 'conhecimento',
+    status: 'ativo',
+    value: '',
+    clientId: '',
+    plaintiff: '',
+    defendant: '',
+    distributionDate: '',
+  });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -37,17 +40,37 @@ const [formData, setFormData] = useState({
 
   useEffect(() => {
     if (process) {
+      const distDate = (process as any).distributionDate || (process as any).distribution_date || '';
       setFormData({
-        number: process.number,
-        cnj: process.cnj || '',
-        clientId: process.clientId || '',
-        subject: process.subject,
+        number: process.number || '',
+        cnj: (process as any).cnj || process.number || '',
+        clientId: process.clientId || (process as any).client_id || '',
+        subject: process.subject || (process as any).title || '',
         class: process.class || '',
         court: process.court || '',
-        comarca: process.comarca || '',
-        phase: process.phase || '',
-        status: process.status,
+        comarca: (process as any).comarca || '',
+        phase: process.phase || 'conhecimento',
+        status: process.status || 'ativo',
         value: process.value ? process.value.toString() : '',
+        plaintiff: (process as any).plaintiff || '',
+        defendant: (process as any).defendant || '',
+        distributionDate: distDate ? String(distDate).slice(0, 10) : '',
+      });
+    } else {
+      setFormData({
+        number: '',
+        cnj: '',
+        subject: '',
+        court: '',
+        comarca: '',
+        class: '',
+        phase: 'conhecimento',
+        status: 'ativo',
+        value: '',
+        clientId: '',
+        plaintiff: '',
+        defendant: '',
+        distributionDate: '',
       });
     }
   }, [process]);
@@ -63,30 +86,20 @@ const [formData, setFormData] = useState({
       newErrors.subject = 'Assunto é obrigatório';
     }
 
-    if (!formData.clientId) {
-      newErrors.clientId = 'Cliente é obrigatório';
-    }
-
-    // Validar formato CNJ se preenchido
-    if (formData.cnj) {
-      const cnjPattern = /^\d{7}-\d{2}\.\d{4}\.\d{1}\.\d{2}\.\d{4}$/;
-      if (!cnjPattern.test(formData.cnj)) {
-        newErrors.cnj = 'Formato CNJ inválido (0000000-00.0000.0.00.0000)';
-      }
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (validateForm()) {
-      const processData = {
+      const processData: any = {
         ...formData,
-        client_id: formData.clientId,
-        value: formData.value ? parseFloat(formData.value) : undefined,
+        client_id: formData.clientId || null,
+        distribution_date: formData.distributionDate || null,
+        distributionDate: formData.distributionDate || null,
+        value: formData.value ? parseFloat(formData.value) : 0,
       };
       onSave(processData);
     }
@@ -94,17 +107,14 @@ const [formData, setFormData] = useState({
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
   const formatProcessNumber = (value: string) => {
-    // Remove caracteres não numéricos
     const cleaned = value.replace(/\D/g, '');
-    
-    // Aplica máscara CNJ: 0000000-00.0000.0.00.0000
     if (cleaned.length <= 20) {
       return cleaned.replace(/(\d{7})(\d{2})(\d{4})(\d{1})(\d{2})(\d{4})/, '$1-$2.$3.$4.$5.$6');
     }
@@ -140,11 +150,16 @@ const [formData, setFormData] = useState({
                   <input
                     type="text"
                     value={formData.number}
-                    onChange={(e) => handleChange('number', e.target.value)}
+                    onChange={(e) => {
+                      handleChange('number', e.target.value);
+                      if (!formData.cnj) {
+                        handleChange('cnj', formatProcessNumber(e.target.value));
+                      }
+                    }}
                     className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       errors.number ? 'border-red-300' : 'border-gray-300'
                     }`}
-                    placeholder="1234567-89.2024.8.05.0001"
+                    placeholder="0163659-65.2026.8.05.0001"
                   />
                 </div>
                 {errors.number && <p className="text-red-600 text-sm mt-1">{errors.number}</p>}
@@ -152,38 +167,17 @@ const [formData, setFormData] = useState({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CNJ (Formatado)
-                </label>
-                <input
-                  type="text"
-                  value={formData.cnj}
-                  onChange={(e) => {
-                    const formatted = formatProcessNumber(e.target.value);
-                    handleChange('cnj', formatted);
-                  }}
-                  className={`px-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.cnj ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="1234567-89.2024.8.05.0001"
-                />
-                {errors.cnj && <p className="text-red-600 text-sm mt-1">{errors.cnj}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cliente *
+                  Cliente Vinculado (Dropdown)
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <select
                     value={formData.clientId}
                     onChange={(e) => handleChange('clientId', e.target.value)}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.clientId ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={loadingClients}
                   >
-                    <option value="">Selecione um cliente</option>
+                    <option value="">Selecione ou deixe sem vínculo</option>
                     {clients.map((client: Client) => (
                       <option key={client.id} value={client.id}>
                         {client.name} {client.document && `(${client.document})`}
@@ -191,7 +185,33 @@ const [formData, setFormData] = useState({
                     ))}
                   </select>
                 </div>
-                {errors.clientId && <p className="text-red-600 text-sm mt-1">{errors.clientId}</p>}
+              </div>
+
+              {/* Partes Processuais */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Autor / Promovente
+                </label>
+                <input
+                  type="text"
+                  value={formData.plaintiff}
+                  onChange={(e) => handleChange('plaintiff', e.target.value)}
+                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nome do Promovente / Autor"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Réu / Promovido
+                </label>
+                <input
+                  type="text"
+                  value={formData.defendant}
+                  onChange={(e) => handleChange('defendant', e.target.value)}
+                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nome da Empresa ou Réu"
+                />
               </div>
 
               <div>
@@ -210,6 +230,21 @@ const [formData, setFormData] = useState({
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Data de Distribuição
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="date"
+                    value={formData.distributionDate}
+                    onChange={(e) => handleChange('distributionDate', e.target.value)}
+                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Assunto/Matéria *
@@ -223,7 +258,7 @@ const [formData, setFormData] = useState({
                     className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       errors.subject ? 'border-red-300' : 'border-gray-300'
                     }`}
-                    placeholder="Ex: Ação de Cobrança, Divórcio Consensual, etc."
+                    placeholder="Ex: Procedimento do Juizado Especial Cível, Ação de Cobrança"
                   />
                 </div>
                 {errors.subject && <p className="text-red-600 text-sm mt-1">{errors.subject}</p>}
@@ -233,7 +268,7 @@ const [formData, setFormData] = useState({
 
           {/* Informações Processuais */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Processuais</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Judiciais</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -244,7 +279,7 @@ const [formData, setFormData] = useState({
                   value={formData.class}
                   onChange={(e) => handleChange('class', e.target.value)}
                   className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ex: Procedimento Comum, Execução, etc."
+                  placeholder="Ex: Procedimento do Juizado Especial Cível"
                 />
               </div>
 
@@ -272,7 +307,7 @@ const [formData, setFormData] = useState({
                     value={formData.court}
                     onChange={(e) => handleChange('court', e.target.value)}
                     className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: 1ª Vara Cível de Salvador"
+                    placeholder="Ex: TJ-BA / 1ª Vara Juizado Especial"
                   />
                 </div>
               </div>
@@ -288,14 +323,14 @@ const [formData, setFormData] = useState({
                     value={formData.comarca}
                     onChange={(e) => handleChange('comarca', e.target.value)}
                     className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: Salvador, Feira de Santana"
+                    placeholder="Ex: Salvador, Camaçari"
                   />
                 </div>
               </div>
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Valor da Causa
+                  Valor da Causa (R$)
                 </label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -323,9 +358,9 @@ const [formData, setFormData] = useState({
             <button
               type="submit"
               disabled={isLoading || loadingClients}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              {isLoading ? 'Salvando...' : (process ? 'Salvar' : 'Criar')}
+              {isLoading ? 'Salvando...' : (process ? 'Salvar Alterações' : 'Criar Processo')}
             </button>
           </div>
         </form>

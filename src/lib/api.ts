@@ -120,7 +120,7 @@ export const processesService = {
       }
 
       if (params?.search) {
-        query = query.or(`number.ilike.%${params.search}%,subject.ilike.%${params.search}%,title.ilike.%${params.search}%`);
+        query = query.or(`number.ilike.%${params.search}%,subject.ilike.%${params.search}%,title.ilike.%${params.search}%,plaintiff.ilike.%${params.search}%,defendant.ilike.%${params.search}%`);
       }
 
       query = query.order('created_at', { ascending: false });
@@ -129,22 +129,23 @@ export const processesService = {
       if (error) throw new Error(error.message);
 
       const processes: Process[] = (data || []).map((p: any) => ({
-  id: p.id,
-  number: p.number,
-  subject: p.subject || p.title || 'Sem assunto',
-  status: p.status || 'ativo',
-  phase: p.phase || 'conhecimento',
-  court: p.court || '',
-  class: p.class || '',
-  value: Number(p.value) || 0,
-  plaintiff: p.plaintiff || null,
-  defendant: p.defendant || null,
-  distributionDate: p.distribution_date || null,
-  createdAt: p.created_at,
-  updatedAt: p.updated_at || p.created_at,
-  client: p.client || null,
-  clientId: p.client_id || null,
-}));
+        id: p.id,
+        number: p.number,
+        subject: p.subject || p.title || 'Sem assunto',
+        status: p.status || 'ativo',
+        phase: p.phase || 'conhecimento',
+        court: p.court || '',
+        class: p.class || '',
+        value: Number(p.value) || 0,
+        plaintiff: p.plaintiff || null,
+        defendant: p.defendant || null,
+        distributionDate: p.distribution_date || null,
+        distribution_date: p.distribution_date || null,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at || p.created_at,
+        client: p.client || null,
+        clientId: p.client_id || null,
+      }));
 
       return { processes, total: count || processes.length };
     } catch (err: any) {
@@ -164,17 +165,20 @@ export const processesService = {
     return data;
   },
 
-  async create(data: Partial<Process>): Promise<Process> {
+  async create(data: any): Promise<Process> {
     const payload = {
       number: data.number,
       title: data.subject || data.number,
-      subject: data.subject,
+      subject: data.subject || 'Sem assunto',
       status: data.status || 'ativo',
-      phase: data.phase,
-      court: data.court,
-      class: data.class,
-      value: data.value,
-      client_id: data.clientId,
+      phase: data.phase || 'conhecimento',
+      court: data.court || null,
+      class: data.class || null,
+      value: data.value ? Number(data.value) : 0,
+      client_id: data.clientId || data.client_id || null,
+      plaintiff: data.plaintiff || null,
+      defendant: data.defendant || null,
+      distribution_date: data.distributionDate || data.distribution_date || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -189,16 +193,20 @@ export const processesService = {
     return created;
   },
 
-  async update(id: string, data: Partial<Process>): Promise<Process> {
-    const payload = {
+  async update(id: string, data: any): Promise<Process> {
+    const payload: any = {
       number: data.number,
+      title: data.subject || data.number,
       subject: data.subject,
       status: data.status,
       phase: data.phase,
       court: data.court,
       class: data.class,
-      value: data.value,
-      client_id: data.clientId,
+      value: data.value !== undefined ? Number(data.value) : 0,
+      client_id: data.clientId || data.client_id || null,
+      plaintiff: data.plaintiff,
+      defendant: data.defendant,
+      distribution_date: data.distributionDate || data.distribution_date || null,
       updated_at: new Date().toISOString()
     };
 
@@ -567,7 +575,7 @@ export const dashboardService = {
 };
 
 // ==========================================
-// 9. USUÁRIOS (usersService - Declarado apenas UMA vez)
+// 9. USUÁRIOS (usersService)
 // ==========================================
 export const usersService = {
   async getAll(): Promise<{ users: any[] }> {

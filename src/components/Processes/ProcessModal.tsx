@@ -11,19 +11,19 @@ interface ProcessModalProps {
   isLoading: boolean;
 }
 
-const ProcessModal: React.FC<ProcessModalProps> = ({ process, onSave, onClose, isLoading }) => {
-  const [formData, setFormData] = useState({
-    number: '',
-    cnj: '',
-    clientId: '',
-    subject: '',
-    class: '',
-    court: '',
-    comarca: '',
-    phase: '',
-    status: 'ativo' as 'ativo' | 'suspenso' | 'arquivado' | 'baixado',
-    value: '',
-  });
+const [formData, setFormData] = useState({
+  number: process?.number || '',
+  subject: process?.subject || '',
+  court: process?.court || '',
+  class: process?.class || '',
+  phase: process?.phase || 'conhecimento',
+  status: process?.status || 'ativo',
+  value: process?.value || 0,
+  clientId: process?.clientId || '',
+  plaintiff: (process as any)?.plaintiff || '',
+  defendant: (process as any)?.defendant || '',
+  distributionDate: (process as any)?.distributionDate || (process as any)?.distribution_date || '',
+});
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 

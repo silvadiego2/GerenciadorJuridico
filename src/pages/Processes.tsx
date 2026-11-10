@@ -12,7 +12,12 @@ import {
   Trash2, 
   Loader2, 
   DownloadCloud, 
-  Layers 
+  Layers,
+  X,
+  User,
+  Calendar,
+  Building2,
+  FileText
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { processesService } from '../lib/api';
@@ -32,6 +37,9 @@ const Processes: React.FC = () => {
   const [isOabModalOpen, setIsOabModalOpen] = useState(false);
   const [isImportarPjeModalOpen, setIsImportarPjeModalOpen] = useState(false);
   const [editingProcess, setEditingProcess] = useState<Process | null>(null);
+  
+  // Estado para controlar o modal de visualização de detalhes (ao clicar no olho)
+  const [viewingProcess, setViewingProcess] = useState<any | null>(null);
 
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
@@ -44,7 +52,7 @@ const Processes: React.FC = () => {
       search: debouncedSearchTerm || undefined,
       status: selectedStatus !== 'all' ? selectedStatus : undefined,
     }),
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 5 * 60 * 1000,
   });
 
   const processes = processesData?.processes || [];
@@ -151,6 +159,17 @@ const Processes: React.FC = () => {
     }
   };
 
+  const formatNullableDate = (dateVal?: string | Date) => {
+    if (!dateVal) return '-';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '-';
+      return format(d, "dd/MM/yyyy", { locale: ptBR });
+    } catch {
+      return '-';
+    }
+  };
+
   if (queryError) {
     return (
       <div className="p-6">
@@ -172,7 +191,6 @@ const Processes: React.FC = () => {
 
         {/* Botões de Ação */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Botão Novo: Importar do PJe / Tribunais */}
           <button
             type="button"
             onClick={() => setIsImportarPjeModalOpen(true)}
@@ -183,7 +201,6 @@ const Processes: React.FC = () => {
             <span>Importar do PJe</span>
           </button>
 
-          {/* Botão Buscar por OAB */}
           <button
             type="button"
             onClick={() => setIsOabModalOpen(true)}
@@ -193,7 +210,6 @@ const Processes: React.FC = () => {
             <span>Buscar por OAB</span>
           </button>
 
-          {/* Botão Novo Processo Manual */}
           <button 
             type="button"
             onClick={handleCreateProcess}
@@ -248,89 +264,106 @@ const Processes: React.FC = () => {
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {processes.map((process) => (
-              <div key={process.id} className="p-5 hover:bg-gray-50/80 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3.5 flex-1">
-                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Scale className="h-5 w-5 text-blue-600" />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2.5 mb-1.5 flex-wrap">
-                        <h3 className="text-base font-bold text-gray-900 truncate">
-                          {process.subject || process.title || 'Processo Judicial'}
-                        </h3>
-                        <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full ${getStatusColor(process.status)}`}>
-                          {process.status.charAt(0).toUpperCase() + process.status.slice(1)}
-                        </span>
+            {processes.map((process: any) => {
+              const displayClient = process.client?.name || process.plaintiff || 'Não vinculado';
+              
+              return (
+                <div key={process.id} className="p-5 hover:bg-gray-50/80 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3.5 flex-1">
+                      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Scale className="h-5 w-5 text-blue-600" />
                       </div>
                       
-                      <p className="font-mono text-xs font-semibold text-gray-700 mb-1">{process.number}</p>
-                      <p className="text-xs text-gray-600 mb-2">
-                        <strong>Cliente / Interessado:</strong> {process.client?.name || 'Não vinculado'}
-                      </p>
-                      
-                      <div className="flex flex-wrap items-center gap-2.5 text-xs text-gray-600">
-                        {process.class && <span><strong>Classe:</strong> {process.class}</span>}
-                        {process.court && <span><strong>Vara:</strong> {process.court}</span>}
-                        {process.phase && (
-                          <span className={`px-2 py-0.5 rounded-md border text-[10px] font-medium ${getPhaseColor(process.phase)}`}>
-                            {process.phase}
-                          </span>
-                        )}
-                      </div>
-                      
-                      {process.value && (
-                        <div className="flex items-center space-x-1 mt-2">
-                          <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
-                          <span className="text-xs font-bold text-emerald-700">
-                            R$ {process.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2.5 mb-1.5 flex-wrap">
+                          <h3 className="text-base font-bold text-gray-900 truncate">
+                            {process.subject || process.title || 'Processo Judicial'}
+                          </h3>
+                          <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full ${getStatusColor(process.status)}`}>
+                            {process.status.charAt(0).toUpperCase() + process.status.slice(1)}
                           </span>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3 ml-4 flex-shrink-0">
-                    <div className="text-right text-xs text-gray-500 hidden sm:block">
-                      <p>Atualizado em</p>
-                      <p className="font-semibold text-gray-700">
-                        {process.updatedAt ? format(new Date(process.updatedAt), "dd/MM/yyyy", { locale: ptBR }) : '-'}
-                      </p>
+                        
+                        <p className="font-mono text-xs font-semibold text-gray-700 mb-1">{process.number}</p>
+                        
+                        {/* Partes do Processo */}
+                        <div className="text-xs text-gray-600 space-y-0.5 mb-2">
+                          <p>
+                            <strong>Cliente / Interessado:</strong> <span className="text-blue-700 font-medium">{displayClient}</span>
+                          </p>
+                          {process.defendant && process.defendant !== 'Não informado' && (
+                            <p>
+                              <strong>Parte Ré / Promovido:</strong> <span className="text-gray-800">{process.defendant}</span>
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-2.5 text-xs text-gray-600">
+                          {process.class && <span><strong>Classe:</strong> {process.class}</span>}
+                          {process.distributionDate && (
+                            <span><strong>Distribuição:</strong> {formatNullableDate(process.distributionDate)}</span>
+                          )}
+                          {process.court && <span><strong>Vara/Tribunal:</strong> {process.court}</span>}
+                          {process.phase && (
+                            <span className={`px-2 py-0.5 rounded-md border text-[10px] font-medium ${getPhaseColor(process.phase)}`}>
+                              {process.phase}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {process.value && (
+                          <div className="flex items-center space-x-1 mt-2">
+                            <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                            <span className="text-xs font-bold text-emerald-700">
+                              R$ {Number(process.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="flex items-center space-x-1">
-                      <button 
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Visualizar detalhes"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleEditProcess(process)}
-                        className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                        title="Editar processo"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteProcess(process.id, process.number)}
-                        disabled={deleteProcessMutation.isPending}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                        title="Excluir processo"
-                      >
-                        {deleteProcessMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
+                    <div className="flex items-center space-x-3 ml-4 flex-shrink-0">
+                      <div className="text-right text-xs text-gray-500 hidden sm:block">
+                        <p>Atualizado em</p>
+                        <p className="font-semibold text-gray-700">
+                          {formatNullableDate(process.updatedAt)}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center space-x-1">
+                        <button 
+                          onClick={() => setViewingProcess(process)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Visualizar detalhes"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleEditProcess(process)}
+                          className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Editar processo"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProcess(process.id, process.number)}
+                          disabled={deleteProcessMutation.isPending}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="Excluir processo"
+                        >
+                          {deleteProcessMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {processes.length === 0 && (
               <div className="p-12 text-center">
@@ -339,13 +372,142 @@ const Processes: React.FC = () => {
                 </div>
                 <h3 className="text-sm font-bold text-gray-800">Nenhum processo localizado</h3>
                 <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
-                  Você pode cadastrar manualmente ou clicar em <strong>"Importar do PJe"</strong> para puxar seu acervo com o Bookmarklet.
+                  Você pode cadastrar manualmente ou utilizar a extensão para sincronizar diretamente com o Projudi.
                 </p>
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Modal de Detalhes do Processo (Ativado pelo botão do Olho) */}
+      {viewingProcess && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-150">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Scale className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Detalhes do Processo</h3>
+                  <p className="font-mono text-xs text-gray-500">{viewingProcess.number}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingProcess(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+              {/* Informações Principais */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <span className="text-xs text-slate-500 font-medium">Assunto / Título</span>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">
+                    {viewingProcess.subject || viewingProcess.title || 'Não informado'}
+                  </p>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <span className="text-xs text-slate-500 font-medium">Status / Fase</span>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${getStatusColor(viewingProcess.status)}`}>
+                      {viewingProcess.status.toUpperCase()}
+                    </span>
+                    <span className="text-xs text-slate-600 capitalize">
+                      ({viewingProcess.phase || 'Fase não definida'})
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Partes do Processo */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Partes Processuais</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 border border-blue-100 bg-blue-50/40 rounded-xl">
+                    <div className="flex items-center space-x-2 text-blue-700 mb-1">
+                      <User className="h-4 w-4" />
+                      <span className="text-xs font-bold uppercase">Promovente (Autor / Cliente)</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {viewingProcess.client?.name || viewingProcess.plaintiff || 'Não informado'}
+                    </p>
+                    {viewingProcess.client?.document && (
+                      <p className="text-xs text-slate-500 mt-1">CPF/CNPJ: {viewingProcess.client.document}</p>
+                    )}
+                  </div>
+
+                  <div className="p-4 border border-slate-200 bg-slate-50/60 rounded-xl">
+                    <div className="flex items-center space-x-2 text-slate-700 mb-1">
+                      <Building2 className="h-4 w-4" />
+                      <span className="text-xs font-bold uppercase">Promovido (Parte Ré)</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {viewingProcess.defendant || 'Não informado'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações Judiciais */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Dados da Ação</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-500">Classe Processual</span>
+                    <p className="font-semibold text-slate-800 text-sm mt-0.5">
+                      {viewingProcess.class || 'Não informada'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Data de Distribuição</span>
+                    <p className="font-semibold text-slate-800 text-sm mt-0.5">
+                      {formatNullableDate(viewingProcess.distributionDate)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Tribunal / Vara</span>
+                    <p className="font-semibold text-slate-800 text-sm mt-0.5">
+                      {viewingProcess.court || 'TJ-BA'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Valor da Causa</span>
+                    <p className="font-semibold text-emerald-700 text-sm mt-0.5">
+                      {viewingProcess.value ? `R$ ${Number(viewingProcess.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Não atribuído'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Cadastrado no Sistema</span>
+                    <p className="font-semibold text-slate-800 text-sm mt-0.5">
+                      {formatNullableDate(viewingProcess.createdAt)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Última Atualização</span>
+                    <p className="font-semibold text-slate-800 text-sm mt-0.5">
+                      {formatNullableDate(viewingProcess.updatedAt)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setViewingProcess(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Processo (Manual) */}
       {isModalOpen && (

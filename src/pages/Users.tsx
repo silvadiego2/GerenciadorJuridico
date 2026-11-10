@@ -21,18 +21,28 @@ const Users: React.FC = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // Query para buscar usuários
-  const { data: users, isLoading, error: queryError } = useQuery({
+  const { data: usersResponse, isLoading, error: queryError } = useQuery({
     queryKey: ['users', debouncedSearchTerm, selectedRole],
     queryFn: () => usersService.getAll(),
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Filtrar usuários no frontend (já que o backend não suporta filtros ainda)
-  const filteredUsers = (users || []).filter((user: UserType) => {
-    const matchesSearch = user.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                         (user.oab && user.oab.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
-    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
+  // Extração defensiva da lista de usuários
+  const usersList: UserType[] = Array.isArray((usersResponse as any)?.users)
+    ? (usersResponse as any).users
+    : Array.isArray(usersResponse)
+    ? usersResponse
+    : [];
+
+  // Filtrar usuários no frontend com segurança contra valores nulos/undefined
+  const filteredUsers = usersList.filter((user: UserType) => {
+    const term = (debouncedSearchTerm || '').toLowerCase();
+    const nameMatch = (user?.name || '').toLowerCase().includes(term);
+    const emailMatch = (user?.email || '').toLowerCase().includes(term);
+    const oabMatch = (user?.oab || '').toLowerCase().includes(term);
+
+    const matchesSearch = nameMatch || emailMatch || oabMatch;
+    const matchesRole = selectedRole === 'all' || user?.role === selectedRole;
     return matchesSearch && matchesRole;
   });
 
@@ -94,8 +104,9 @@ const Users: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDeleteUser = (userId: string, userName: string) => {
-    if (window.confirm(`Tem certeza que deseja excluir o usuário "${userName}"?`)) {
+  const handleDeleteUser = (userId: string, userName?: string) => {
+    const nameDisplay = userName || 'este usuário';
+    if (window.confirm(`Tem certeza que deseja excluir o usuário "${nameDisplay}"?`)) {
       deleteUserMutation.mutate(userId);
     }
   };
@@ -108,7 +119,18 @@ const Users: React.FC = () => {
     }
   };
 
-  const getRoleColor = (role: string) => {
+  const formatCreationDate = (dateVal?: string | Date) => {
+    if (!dateVal) return 'Data não informada';
+    try {
+      const parsed = new Date(dateVal);
+      if (isNaN(parsed.getTime())) return 'Data não informada';
+      return format(parsed, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
+    } catch {
+      return 'Data não informada';
+    }
+  };
+
+  const getRoleColor = (role?: string) => {
     switch (role) {
       case 'admin':
         return 'bg-red-100 text-red-800';
@@ -123,22 +145,19 @@ const Users: React.FC = () => {
     }
   };
 
-  const getRoleIcon = (role: string) => {
+  const getRoleIcon = (role?: string) => {
     switch (role) {
       case 'admin':
         return Shield;
       case 'advogado':
-        return User;
       case 'estagiario':
-        return User;
       case 'cliente':
-        return User;
       default:
         return User;
     }
   };
 
-  const getRoleName = (role: string) => {
+  const getRoleName = (role?: string) => {
     switch (role) {
       case 'admin':
         return 'Administrador';
@@ -149,7 +168,7 @@ const Users: React.FC = () => {
       case 'cliente':
         return 'Cliente';
       default:
-        return role;
+        return role || 'Usuário';
     }
   };
 
@@ -225,21 +244,21 @@ const Users: React.FC = () => {
         ) : (
           <div className="divide-y divide-gray-200">
             {filteredUsers.map((user: UserType) => {
-              const RoleIcon = getRoleIcon(user.role);
+              const RoleIcon = getRoleIcon(user?.role);
               return (
-                <div key={user.id} className="p-6 hover:bg-gray-50 transition-colors">
+                <div key={user?.id || Math.random().toString()} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                         <RoleIcon className="h-6 w-6 text-blue-600" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{user.name}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">{user?.name || 'Sem nome'}</h3>
                         <div className="flex items-center space-x-4 mt-1">
-                          <span className={`px-2 py-1 text-xs rounded-full ${getRoleColor(user.role)}`}>
-                            {getRoleName(user.role)}
+                          <span className={`px-2 py-1 text-xs rounded-full ${getRoleColor(user?.role)}`}>
+                            {getRoleName(user?.role)}
                           </span>
-                          {user.oab && (
+                          {user?.oab && (
                             <span className="text-sm text-gray-600 font-mono">OAB: {user.oab}</span>
                           )}
                         </div>
@@ -250,9 +269,9 @@ const Users: React.FC = () => {
                       <div className="text-right text-sm text-gray-600 hidden sm:block">
                         <div className="flex items-center space-x-1 mb-1">
                           <Mail className="h-4 w-4" />
-                          <span>{user.email}</span>
+                          <span>{user?.email || 'Sem email'}</span>
                         </div>
-                        {user.phone && (
+                        {user?.phone && (
                           <div className="flex items-center space-x-1">
                             <Phone className="h-4 w-4" />
                             <span>{user.phone}</span>
@@ -286,7 +305,7 @@ const Users: React.FC = () => {
                     <div className="flex items-center space-x-1">
                       <Calendar className="h-4 w-4" />
                       <span>
-                        Cadastrado em {format(new Date(user.createdAt), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        Cadastrado em {formatCreationDate(user?.createdAt)}
                       </span>
                     </div>
                   </div>

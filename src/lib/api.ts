@@ -129,19 +129,22 @@ export const processesService = {
       if (error) throw new Error(error.message);
 
       const processes: Process[] = (data || []).map((p: any) => ({
-        id: p.id,
-        number: p.number,
-        subject: p.subject || p.title || 'Sem assunto',
-        status: p.status || 'ativo',
-        phase: p.phase || 'conhecimento',
-        court: p.court || '',
-        class: p.class || '',
-        value: Number(p.value) || 0,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at || p.created_at,
-        client: p.client || null,
-        clientId: p.client_id || null,
-      }));
+  id: p.id,
+  number: p.number,
+  subject: p.subject || p.title || 'Sem assunto',
+  status: p.status || 'ativo',
+  phase: p.phase || 'conhecimento',
+  court: p.court || '',
+  class: p.class || '',
+  value: Number(p.value) || 0,
+  plaintiff: p.plaintiff || null,
+  defendant: p.defendant || null,
+  distributionDate: p.distribution_date || null,
+  createdAt: p.created_at,
+  updatedAt: p.updated_at || p.created_at,
+  client: p.client || null,
+  clientId: p.client_id || null,
+}));
 
       return { processes, total: count || processes.length };
     } catch (err: any) {

@@ -312,8 +312,8 @@ const Processes: React.FC = () => {
                           )}
                         </div>
                         
-                        {process.value && (
-                          <div className="flex items-center space-x-1 mt-2">
+                        {Boolean(process.value && Number(process.value) > 0) && (
+  <div className="flex items-center space-x-1 mt-2">
                             <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
                             <span className="text-xs font-bold text-emerald-700">
                               R$ {Number(process.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

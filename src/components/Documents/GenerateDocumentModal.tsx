@@ -139,24 +139,31 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     }
   };
 
-  // Salvar na Pasta Digital com persistência completa
+  // Salvar na Pasta Digital com validação, fallback e retorno transparente
   const saveDocumentMutation = useMutation({
     mutationFn: async () => {
       const tpl = templates.find((t: any) => t.id === selectedTemplateId);
-      const title = `${tpl?.title || 'Documento'} - ${process?.number || 'Processo'}`;
+      const docTitle = `${tpl?.title || 'Documento'} - ${process?.number || 'Processo'}`;
       const rawText = editorRef.current?.innerText || '';
       const htmlContent = editorRef.current?.innerHTML || '';
 
+      if (!rawText.trim()) {
+        throw new Error('O documento está vazio. Digite ou carregue um modelo antes de salvar.');
+      }
+
+      // Normaliza o ID do processo (garante compatibilidade com process.id e process.processId)
       const targetProcessId = process?.id || process?.processId || null;
       const targetClientId = process?.client_id || process?.clientId || clientData?.id || null;
 
-      const payload = {
-        name: `${title}.txt`,
-        title: title,
+      console.log('Gravando documento com vínculo:', { targetProcessId, targetClientId, docTitle });
+
+      const payload: Record<string, any> = {
+        name: `${docTitle}.txt`,
+        title: docTitle,
         type: 'text/plain',
         content: rawText,
         html_content: htmlContent,
-        size: new Blob([rawText]).size,
+        size: new Blob([rawText], { type: 'text/plain' }).size,
         process_id: targetProcessId,
         client_id: targetClientId,
         category: tpl?.category || 'Minutas e Peças',
@@ -165,37 +172,49 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
         updated_at: new Date().toISOString()
       };
 
-      const { error: insertErr } = await supabase
+      const { data, error: insertErr } = await supabase
         .from('documents')
-        .insert([payload]);
+        .insert([payload])
+        .select();
 
       if (insertErr) {
-        // Fallback para caso colunas extras (title, html_content, category) não existam na tabela documents
-        const fallbackPayload = {
-          name: `${title}.txt`,
+        console.warn('Tentativa com payload completo falhou, aplicando fallback simples:', insertErr);
+        // Fallback enxuto apenas com as colunas essenciais
+        const fallbackPayload: Record<string, any> = {
+          name: `${docTitle}.txt`,
           size: new Blob([rawText]).size,
           type: 'text/plain',
           process_id: targetProcessId,
           client_id: targetClientId,
-          description: rawText.substring(0, 500),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          description: rawText.substring(0, 300),
+          created_at: new Date().toISOString()
         };
-        const { error: fallbackErr } = await supabase.from('documents').insert([fallbackPayload]);
-        if (fallbackErr) throw fallbackErr;
+
+        const { error: fallbackErr } = await supabase
+          .from('documents')
+          .insert([fallbackPayload]);
+
+        if (fallbackErr) {
+          console.error('Erro crítico no Supabase ao salvar documento:', fallbackErr);
+          throw new Error(fallbackErr.message || 'Falha nas regras do banco de dados (RLS ou colunas).');
+        }
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       const pid = process?.id || process?.processId;
-      if (pid) {
-        queryClient.invalidateQueries({ queryKey: ['process-documents', pid] });
-      }
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
-      success('Salvo na Pasta Digital', 'A peça foi registrada nos documentos deste processo.');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['process-documents'] }),
+        queryClient.invalidateQueries({ queryKey: ['process-documents', pid] }),
+        queryClient.invalidateQueries({ queryKey: ['documents'] })
+      ]);
+      success('Salvo na Pasta Digital', 'O documento foi salvo e já está listado nos autos.');
       if (onSuccess) onSuccess();
       onClose();
     },
-    onError: (err: any) => error('Erro ao salvar', err.message || 'Falha ao persistir documento no banco.')
+    onError: (err: any) => {
+      console.error('Erro retornado na mutation:', err);
+      error('Falha ao Salvar', err.message || 'Não foi possível gravar o arquivo na Pasta Digital.');
+    }
   });
 
   const handleCopy = () => {

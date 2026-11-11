@@ -1,3 +1,4 @@
+// src/components/Clients/ClientModal.tsx
 import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Phone, FileText, MapPin, Building } from 'lucide-react';
 import { Client } from '../../types';
@@ -23,7 +24,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
       complement: '',
       neighborhood: '',
       city: '',
-      state: '',
+      state: 'BA',
       zipCode: '',
     },
   });
@@ -33,19 +34,37 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
   useEffect(() => {
     if (client) {
       setFormData({
-        name: client.name,
+        name: client.name || '',
         email: client.email || '',
         phone: client.phone || '',
         document: client.document || '',
-        type: client.type,
-        status: client.status,
-        address: client.address || {
+        type: client.type || 'fisica',
+        status: (client.status as any) || 'ativo',
+        address: {
+          street: client.address?.street || '',
+          number: client.address?.number || '',
+          complement: client.address?.complement || '',
+          neighborhood: client.address?.neighborhood || '',
+          city: client.address?.city || '',
+          state: client.address?.state || 'BA',
+          zipCode: client.address?.zipCode || '',
+        },
+      });
+    } else {
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        document: '',
+        type: 'fisica',
+        status: 'ativo',
+        address: {
           street: '',
           number: '',
           complement: '',
           neighborhood: '',
           city: '',
-          state: '',
+          state: 'BA',
           zipCode: '',
         },
       });
@@ -65,10 +84,10 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
 
     if (formData.document) {
       const cleanDoc = formData.document.replace(/\D/g, '');
-      if (formData.type === 'fisica' && cleanDoc.length !== 11) {
-        newErrors.document = 'CPF deve ter 11 dígitos';
-      } else if (formData.type === 'juridica' && cleanDoc.length !== 14) {
-        newErrors.document = 'CNPJ deve ter 14 dígitos';
+      if (formData.type === 'fisica' && cleanDoc.length > 0 && cleanDoc.length !== 11) {
+        newErrors.document = 'CPF deve conter 11 dígitos';
+      } else if (formData.type === 'juridica' && cleanDoc.length > 0 && cleanDoc.length !== 14) {
+        newErrors.document = 'CNPJ deve conter 14 dígitos';
       }
     }
 
@@ -82,8 +101,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
     if (validateForm()) {
       const clientData = {
         ...formData,
-        // Limpar campos vazios do endereço
-        address: Object.values(formData.address).some(value => value.trim()) 
+        address: Object.values(formData.address).some(value => value && value.trim()) 
           ? formData.address 
           : undefined,
       };
@@ -110,61 +128,87 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
   const formatDocument = (value: string, type: 'fisica' | 'juridica') => {
     const cleaned = value.replace(/\D/g, '');
     if (type === 'fisica') {
-      // CPF: 000.000.000-00
-      return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      return cleaned.slice(0, 11).replace(/(\d{3})(\d{3})?(\d{3})?(\d{2})?/, (_, p1, p2, p3, p4) => {
+        let res = p1;
+        if (p2) res += `.${p2}`;
+        if (p3) res += `.${p3}`;
+        if (p4) res += `-${p4}`;
+        return res;
+      });
     } else {
-      // CNPJ: 00.000.000/0000-00
-      return cleaned.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+      return cleaned.slice(0, 14).replace(/(\d{2})(\d{3})?(\d{3})?(\d{4})?(\d{2})?/, (_, p1, p2, p3, p4, p5) => {
+        let res = p1;
+        if (p2) res += `.${p2}`;
+        if (p3) res += `.${p3}`;
+        if (p4) res += `/${p4}`;
+        if (p5) res += `-${p5}`;
+        return res;
+      });
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {client ? 'Editar Cliente' : 'Novo Cliente'}
-          </h2>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden text-xs">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded bg-slate-900 text-white flex items-center justify-center shrink-0">
+              <User className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                {client ? 'Editar Cadastro de Cliente' : 'Novo Cliente / Parte'}
+              </h2>
+              <p className="text-[11px] text-slate-400">Informações de contato e documentação da parte representada</p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Informações Básicas */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Básicas</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome Completo *
+        {/* Formulário com rolagem */}
+        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 flex-1">
+          {/* Dados Pessoais / Empresariais */}
+          <div className="space-y-3">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pb-1 border-b border-slate-100">
+              Qualificação Civil
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-medium mb-1">
+                  Nome Completo / Razão Social *
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.name ? 'border-red-300' : 'border-gray-300'
+                    className={`pl-9 pr-3 py-1.5 w-full border rounded-md text-xs focus:outline-hidden focus:border-slate-400 ${
+                      errors.name ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 focus:bg-white'
                     }`}
-                    placeholder="Digite o nome completo"
+                    placeholder="Nome completo da pessoa física ou razão social"
                   />
                 </div>
-                {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
+                {errors.name && <p className="text-rose-600 text-[11px] mt-0.5">{errors.name}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo *
+                <label className="block text-slate-700 font-medium mb-1">
+                  Natureza Jurídica
                 </label>
                 <select
                   value={formData.type}
-                  onChange={(e) => handleChange('type', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) => {
+                    const newType = e.target.value as 'fisica' | 'juridica';
+                    setFormData(prev => ({ ...prev, type: newType, document: '' }));
+                  }}
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
                 >
                   <option value="fisica">Pessoa Física</option>
                   <option value="juridica">Pessoa Jurídica</option>
@@ -172,13 +216,13 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status *
+                <label className="block text-slate-700 font-medium mb-1">
+                  Situação Cadastral
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => handleChange('status', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
                 >
                   <option value="ativo">Ativo</option>
                   <option value="inativo">Inativo</option>
@@ -186,11 +230,11 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-slate-700 font-medium mb-1">
                   {formData.type === 'fisica' ? 'CPF' : 'CNPJ'}
                 </label>
                 <div className="relative">
-                  <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="text"
                     value={formData.document}
@@ -198,45 +242,45 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
                       const formatted = formatDocument(e.target.value, formData.type);
                       handleChange('document', formatted);
                     }}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.document ? 'border-red-300' : 'border-gray-300'
+                    className={`pl-9 pr-3 py-1.5 w-full border rounded-md font-mono text-xs focus:outline-hidden focus:border-slate-400 ${
+                      errors.document ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 focus:bg-white'
                     }`}
                     placeholder={formData.type === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
                   />
                 </div>
-                {errors.document && <p className="text-red-600 text-sm mt-1">{errors.document}</p>}
+                {errors.document && <p className="text-rose-600 text-[11px] mt-0.5">{errors.document}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  E-mail
+                <label className="block text-slate-700 font-medium mb-1">
+                  E-mail de Contato
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => handleChange('email', e.target.value)}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.email ? 'border-red-300' : 'border-gray-300'
+                    className={`pl-9 pr-3 py-1.5 w-full border rounded-md text-xs focus:outline-hidden focus:border-slate-400 ${
+                      errors.email ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 focus:bg-white'
                     }`}
-                    placeholder="cliente@email.com"
+                    placeholder="contato@cliente.com"
                   />
                 </div>
-                {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
+                {errors.email && <p className="text-rose-600 text-[11px] mt-0.5">{errors.email}</p>}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefone
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-medium mb-1">
+                  Telefone / WhatsApp
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <div className="relative max-w-sm">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                     placeholder="(71) 99999-9999"
                   />
                 </div>
@@ -245,116 +289,120 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
           </div>
 
           {/* Endereço */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Endereço</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3 pt-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pb-1 border-b border-slate-100">
+              Endereço & Comarca
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-slate-700 font-medium mb-1">
                   CEP
                 </label>
                 <input
                   type="text"
                   value={formData.address.zipCode}
                   onChange={(e) => handleChange('address.zipCode', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                   placeholder="00000-000"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estado
-                </label>
-                <input
-                  type="text"
-                  value={formData.address.state}
-                  onChange={(e) => handleChange('address.state', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="BA"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-slate-700 font-medium mb-1">
                   Cidade
                 </label>
                 <input
                   type="text"
                   value={formData.address.city}
                   onChange={(e) => handleChange('address.city', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                   placeholder="Salvador"
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div>
+                <label className="block text-slate-700 font-medium mb-1">
+                  Estado (UF)
+                </label>
+                <input
+                  type="text"
+                  value={formData.address.state}
+                  onChange={(e) => handleChange('address.state', e.target.value)}
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400 uppercase"
+                  placeholder="BA"
+                  maxLength={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-medium mb-1">
                   Bairro
                 </label>
                 <input
                   type="text"
                   value={formData.address.neighborhood}
                   onChange={(e) => handleChange('address.neighborhood', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Centro"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+                  placeholder="Pituba, Centro..."
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rua
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-medium mb-1">
+                  Logradouro (Rua / Av.)
                 </label>
                 <input
                   type="text"
                   value={formData.address.street}
                   onChange={(e) => handleChange('address.street', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Rua das Flores"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+                  placeholder="Av. Tancredo Neves..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-slate-700 font-medium mb-1">
                   Número
                 </label>
                 <input
                   type="text"
                   value={formData.address.number}
                   onChange={(e) => handleChange('address.number', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                   placeholder="123"
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-medium mb-1">
                   Complemento
                 </label>
                 <input
                   type="text"
                   value={formData.address.complement}
                   onChange={(e) => handleChange('address.complement', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Apto 101"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+                  placeholder="Sala 101, Edf. Mandarim"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex space-x-3 pt-4">
+          {/* Rodapé fixo */}
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-3.5 py-1.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-1.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 disabled:opacity-50 transition-colors font-medium shadow-2xs"
             >
-              {isLoading ? 'Salvando...' : (client ? 'Salvar' : 'Criar')}
+              {isLoading ? 'Salvando...' : (client ? 'Salvar Alterações' : 'Cadastrar Cliente')}
             </button>
           </div>
         </form>

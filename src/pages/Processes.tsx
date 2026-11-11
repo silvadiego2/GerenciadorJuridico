@@ -1,5 +1,5 @@
 // src/pages/Processes.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -10,7 +10,9 @@ import {
   Trash2, 
   Loader2, 
   DownloadCloud, 
-  Layers
+  Layers,
+  ChevronDown,
+  Globe
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { processesService } from '../lib/api';
@@ -21,6 +23,7 @@ import ProcessModal from '../components/Processes/ProcessModal';
 import { ProcessDetailsModal } from '../components/Processes/ProcessDetailsModal';
 import { ImportOabModal } from '../components/Processes/ImportOabModal';
 import { ModalImportarProcessos } from '../components/ModalImportarProcessos';
+import { ConsultaProcessosOAB } from '../components/ConsultaProcessosOAB';
 import { useNotifications } from '../hooks/useNotifications';
 import { useDebounce } from '../hooks/useDebounce';
 
@@ -30,16 +33,28 @@ const Processes: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOabModalOpen, setIsOabModalOpen] = useState(false);
   const [isImportarPjeModalOpen, setIsImportarPjeModalOpen] = useState(false);
-  const [editingProcess, setEditingProcess] = useState<Process | null>(null);
+  const [isCentralOabAberta, setIsCentralOabAberta] = useState(false);
+  const [menuImportarAberto, setMenuImportarAberto] = useState(false);
   
-  // Estado para controlar a Ficha Completa do Processo (ao clicar no olho)
+  const [editingProcess, setEditingProcess] = useState<Process | null>(null);
   const [viewingProcess, setViewingProcess] = useState<any | null>(null);
 
+  const menuRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // Query para obter os processos
+  // Fecha o menu de importação ao clicar fora
+  useEffect(() => {
+    const handleClickFora = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuImportarAberto(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickFora);
+    return () => document.removeEventListener('mousedown', handleClickFora);
+  }, []);
+
   const { data: processesData, isLoading, error: queryError } = useQuery({
     queryKey: ['processes', debouncedSearchTerm, selectedStatus],
     queryFn: () => processesService.getAll({
@@ -51,7 +66,6 @@ const Processes: React.FC = () => {
 
   const processes = processesData?.processes || [];
 
-  // Mutation para registar processo
   const createProcessMutation = useMutation({
     mutationFn: processesService.create,
     onSuccess: () => {
@@ -59,12 +73,9 @@ const Processes: React.FC = () => {
       success('Sucesso', 'Processo registado com sucesso!');
       setIsModalOpen(false);
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao criar processo');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Erro ao criar processo')
   });
 
-  // Mutation para atualizar processo
   const updateProcessMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Process> }) =>
       processesService.update(id, data),
@@ -74,21 +85,16 @@ const Processes: React.FC = () => {
       setIsModalOpen(false);
       setEditingProcess(null);
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao atualizar processo');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Erro ao atualizar processo')
   });
 
-  // Mutation para eliminar processo
   const deleteProcessMutation = useMutation({
     mutationFn: processesService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['processes'] });
       success('Sucesso', 'Processo eliminado com sucesso!');
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao eliminar processo');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Erro ao eliminar processo')
   });
 
   const handleCreateProcess = () => {
@@ -112,44 +118,6 @@ const Processes: React.FC = () => {
       updateProcessMutation.mutate({ id: editingProcess.id, data: processData });
     } else {
       createProcessMutation.mutate(processData);
-    }
-  };
-
-  const handleOabImportSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['processes'] });
-    success('Sucesso', 'Processos importados com sucesso!');
-  };
-
-  const handlePjeImportSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['processes'] });
-    success('Sucesso', 'Processos do PJe/Tribunal importados com sucesso!');
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'ativo':
-        return 'bg-emerald-50 text-emerald-800 border-emerald-200';
-      case 'suspenso':
-        return 'bg-amber-50 text-amber-800 border-amber-200';
-      case 'arquivado':
-        return 'bg-slate-100 text-slate-700 border-slate-200';
-      case 'baixado':
-        return 'bg-sky-50 text-sky-800 border-sky-200';
-      default:
-        return 'bg-slate-50 text-slate-700 border-slate-200';
-    }
-  };
-
-  const getPhaseColor = (phase: string) => {
-    switch (phase?.toLowerCase()) {
-      case 'conhecimento':
-        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
-      case 'execução':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'recurso':
-        return 'bg-orange-50 text-orange-700 border-orange-200';
-      default:
-        return 'bg-slate-50 text-slate-700 border-slate-200';
     }
   };
 
@@ -186,29 +154,72 @@ const Processes: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-200">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Acervo Processual</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Gestão de processos judiciais, partes e movimentações</p>
+          <p className="text-xs text-slate-500 mt-0.5">Gestão centralizada de autos, partes e movimentações judiciais</p>
         </div>
 
-        {/* Botões de Ação */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsImportarPjeModalOpen(true)}
-            className="border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-md transition-colors flex items-center space-x-1.5 text-xs font-semibold shadow-2xs"
-            title="Importar em lote através do Bookmarklet ou texto copiado do PJe"
-          >
-            <Layers className="h-3.5 w-3.5 text-slate-500" />
-            <span>Importar do PJe</span>
-          </button>
+        {/* Botões de Ação Unificados */}
+        <div className="flex items-center gap-2">
+          {/* Dropdown de Captura / Importação */}
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuImportarAberto(!menuImportarAberto)}
+              className="border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-md transition-colors flex items-center space-x-1.5 text-xs font-semibold shadow-2xs"
+            >
+              <DownloadCloud className="h-3.5 w-3.5 text-slate-500" />
+              <span>Importar / Capturar</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400 ml-0.5" />
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setIsOabModalOpen(true)}
-            className="border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-md transition-colors flex items-center space-x-1.5 text-xs font-semibold shadow-2xs"
-          >
-            <DownloadCloud className="h-3.5 w-3.5 text-slate-500" />
-            <span>Buscar por OAB</span>
-          </button>
+            {menuImportarAberto && (
+              <div className="absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-30 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuImportarAberto(false);
+                    setIsImportarPjeModalOpen(true);
+                  }}
+                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700"
+                >
+                  <Layers className="h-4 w-4 text-indigo-600 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-slate-800">Lote PJe / Projudi</p>
+                    <span className="text-[10px] text-slate-400 block">Via texto colado ou extensão</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuImportarAberto(false);
+                    setIsCentralOabAberta(true);
+                  }}
+                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 border-t border-slate-100"
+                >
+                  <Globe className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-slate-800">Central OAB & Tribunais</p>
+                    <span className="text-[10px] text-slate-400 block">Consulta online oficial por OAB</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuImportarAberto(false);
+                    setIsOabModalOpen(true);
+                  }}
+                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 border-t border-slate-100"
+                >
+                  <DownloadCloud className="h-4 w-4 text-sky-600 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-slate-800">Importação por API</p>
+                    <span className="text-[10px] text-slate-400 block">Busca rápida via Conector</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
 
           <button 
             type="button"
@@ -280,22 +291,21 @@ const Processes: React.FC = () => {
                           <h3 className="text-sm font-semibold text-slate-900 truncate">
                             {process.subject || process.title || 'Processo Judicial'}
                           </h3>
-                          <span className={`px-2 py-0.5 text-[10px] font-semibold border rounded-sm ${getStatusColor(process.status)}`}>
+                          <span className="px-2 py-0.5 text-[10px] font-semibold border rounded-sm uppercase bg-emerald-50 text-emerald-800 border-emerald-200">
                             {process.status ? process.status.toUpperCase() : 'ATIVO'}
                           </span>
                         </div>
                         
                         <p className="font-mono text-xs font-medium text-slate-700 mb-1">{process.number}</p>
                         
-                        {/* Partes do Processo */}
                         <div className="text-xs text-slate-600 space-y-0.5 mb-2">
                           <p>
-                            <strong className="text-slate-500 font-normal">Cliente / Interessado:</strong>{' '}
+                            <strong className="text-slate-500 font-normal">Cliente:</strong>{' '}
                             <span className="text-slate-900 font-medium">{displayClient}</span>
                           </p>
                           {process.defendant && process.defendant !== 'Não informado' && (
                             <p>
-                              <strong className="text-slate-500 font-normal">Parte Ré / Promovido:</strong>{' '}
+                              <strong className="text-slate-500 font-normal">Parte Ré:</strong>{' '}
                               <span className="text-slate-800">{process.defendant}</span>
                             </p>
                           )}
@@ -307,11 +317,6 @@ const Processes: React.FC = () => {
                             <span><strong>Distribuição:</strong> {formatNullableDate(process.distributionDate)}</span>
                           )}
                           {process.court && <span><strong>Vara/Tribunal:</strong> {process.court}</span>}
-                          {process.phase && (
-                            <span className={`px-1.5 py-0.2 rounded-sm border text-[10px] font-medium capitalize ${getPhaseColor(process.phase)}`}>
-                              {process.phase}
-                            </span>
-                          )}
                         </div>
                         
                         {Boolean(process.value && Number(process.value) > 0) && (
@@ -325,42 +330,29 @@ const Processes: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-3 ml-3 flex-shrink-0">
-                      <div className="text-right text-[11px] text-slate-400 hidden sm:block">
-                        <p>Atualizado em</p>
-                        <p className="font-medium text-slate-600">
-                          {formatNullableDate(process.updatedAt)}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center space-x-1">
-                        <button 
-                          onClick={() => setViewingProcess(process)}
-                          className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                          title="Visualizar Ficha Completa do Processo"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleEditProcess(process)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-                          title="Editar processo"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteProcess(process.id, process.number)}
-                          disabled={deleteProcessMutation.isPending}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
-                          title="Eliminar processo"
-                        >
-                          {deleteProcessMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
+                    <div className="flex items-center space-x-1 ml-3 flex-shrink-0">
+                      <button 
+                        onClick={() => setViewingProcess(process)}
+                        className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                        title="Visualizar Ficha Completa do Processo"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleEditProcess(process)}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                        title="Editar processo"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteProcess(process.id, process.number)}
+                        disabled={deleteProcessMutation.isPending}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+                        title="Eliminar processo"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -374,7 +366,7 @@ const Processes: React.FC = () => {
                 </div>
                 <h3 className="text-xs font-semibold text-slate-800">Nenhum processo localizado</h3>
                 <p className="text-[11px] text-slate-500 mt-0.5 max-w-sm mx-auto">
-                  Registe manualmente ou utilize a extensão no Projudi para sincronizar diretamente.
+                  Registe manualmente ou utilize a central de importação acima.
                 </p>
               </div>
             )}
@@ -382,7 +374,7 @@ const Processes: React.FC = () => {
         )}
       </div>
 
-      {/* Ficha Completa do Processo com Abas (Ativada ao clicar no Olho) */}
+      {/* Ficha Completa do Processo com Abas */}
       {viewingProcess && (
         <ProcessDetailsModal
           process={viewingProcess}
@@ -391,7 +383,22 @@ const Processes: React.FC = () => {
         />
       )}
 
-      {/* Modal de Processo (Edição/Criação Manual) */}
+      {/* Modal da Central OAB Integrada */}
+      {isCentralOabAberta && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-slate-100 w-full max-w-5xl rounded-xl border border-slate-200 shadow-2xl overflow-y-auto max-h-[90vh] p-4 relative">
+            <button
+              onClick={() => setIsCentralOabAberta(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 bg-white border border-slate-200 rounded-md shadow-2xs z-10"
+            >
+              ✕ Fechar
+            </button>
+            <ConsultaProcessosOAB />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Criação / Edição Manual */}
       {isModalOpen && (
         <ProcessModal
           process={editingProcess}
@@ -404,18 +411,17 @@ const Processes: React.FC = () => {
         />
       )}
 
-      {/* Modal de Busca por OAB */}
+      {/* Modais de Importação */}
       <ImportOabModal
         isOpen={isOabModalOpen}
         onClose={() => setIsOabModalOpen(false)}
-        onSuccess={handleOabImportSuccess}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['processes'] })}
       />
 
-      {/* Modal de Importação em Lote do PJe / Bookmarklet */}
       <ModalImportarProcessos
         isOpen={isImportarPjeModalOpen}
         onClose={() => setIsImportarPjeModalOpen(false)}
-        onSucesso={handlePjeImportSuccess}
+        onSucesso={() => queryClient.invalidateQueries({ queryKey: ['processes'] })}
       />
     </div>
   );

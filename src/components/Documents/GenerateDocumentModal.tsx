@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, FileText, Copy, Printer, Check, 
-  Sparkles, Save, Loader2, ArrowRight
+  Sparkles, Save, Loader2, Settings2, Scale
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
@@ -23,11 +23,26 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [renderedContent, setRenderedContent] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [painelConfigAberto, setPainelConfigAberto] = useState(false);
+
+  // Configurações do Papel Timbrado / Página
+  const [pageSettings, setPageSettings] = useState({
+    fontFamily: 'Times New Roman' as 'Times New Roman' | 'Arial' | 'Calibri',
+    fontSize: '12pt',
+    lineHeight: '1.5',
+    exibirCabecalho: true,
+    exibirRodape: true,
+    marcaDaguaTexto: '',
+    escritorioNome: 'SILVA ADVOCACIA & CONSULTORIA JURÍDICA',
+    escritorioOab: 'OAB/BA nº 12.345',
+    escritorioEndereco: 'Av. Tancredo Neves, Salvador/BA',
+    escritorioContato: 'Tel: (71) 3333-4444 • contato@silvaadvocacia.com.br'
+  });
 
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
 
-  // 1. Carrega os Modelos Cadastrados
+  // 1. Carrega os modelos disponíveis
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ['document-templates'],
     queryFn: async () => {
@@ -40,7 +55,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     }
   });
 
-  // 2. Busca dados completos do cliente vinculado ao processo
+  // 2. Busca dados completos do cliente
   const { data: clientData } = useQuery({
     queryKey: ['client-for-template', process?.client_id || process?.clientId],
     queryFn: async () => {
@@ -56,7 +71,6 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     enabled: Boolean(process?.client_id || process?.clientId)
   });
 
-  // 3. Aplica o template quando selecionado
   useEffect(() => {
     if (templates.length > 0 && !selectedTemplateId) {
       setSelectedTemplateId(templates[0].id);
@@ -74,13 +88,12 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     }
   }, [selectedTemplateId, templates, process, clientData]);
 
-  // 4. Salva o documento gerado na Pasta Digital do Processo
+  // Salvar na Pasta Digital
   const saveDocumentMutation = useMutation({
     mutationFn: async () => {
       const tpl = templates.find((t: any) => t.id === selectedTemplateId);
       const title = `${tpl?.title || 'Documento'} - ${process.number}`;
 
-      // Cria um Blob de texto simples como arquivo simulado
       const blob = new Blob([renderedContent], { type: 'text/plain;charset=utf-8' });
       
       const payload = {
@@ -113,22 +126,92 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Motor de Impressão Direta A4 com Estilos de Impressão (@media print)
   const handlePrint = () => {
-    const win = window.open('', '', 'width=800,height=900');
+    const win = window.open('', '', 'width=850,height=950');
     if (!win) return;
+
+    const cabecalhoHtml = pageSettings.exibirCabecalho ? `
+      <div class="print-header">
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 24px;">
+          <div>
+            <h1 style="font-size: 13pt; font-weight: bold; margin: 0; color: #0f172a; letter-spacing: 0.5px;">${pageSettings.escritorioNome}</h1>
+            <p style="font-size: 9.5pt; color: #475569; margin: 2px 0 0 0;">${pageSettings.escritorioOab}</p>
+          </div>
+          <div style="font-size: 8pt; font-family: monospace; color: #64748b; text-align: right;">
+            Autos nº ${process.number}
+          </div>
+        </div>
+      </div>
+    ` : '';
+
+    const rodapeHtml = pageSettings.exibirRodape ? `
+      <div class="print-footer">
+        <div style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin-top: 30px; font-size: 8pt; color: #64748b; text-align: center; line-height: 1.4;">
+          <p style="margin: 0;">${pageSettings.escritorioEndereco} • ${pageSettings.escritorioContato}</p>
+        </div>
+      </div>
+    ` : '';
+
+    const marcaDaguaHtml = pageSettings.marcaDaguaTexto ? `
+      <div class="watermark">${pageSettings.marcaDaguaTexto}</div>
+    ` : '';
+
     win.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
-          <title>${templates.find((t: any) => t.id === selectedTemplateId)?.title || 'Documento'}</title>
+          <title>${templates.find((t: any) => t.id === selectedTemplateId)?.title || 'Documento Judicial'}</title>
           <style>
-            body { font-family: 'Times New Roman', Times, serif; font-size: 13pt; line-height: 1.6; padding: 40px; color: #111; }
-            pre { white-space: pre-wrap; font-family: inherit; }
+            @page {
+              size: A4 portrait;
+              margin: 25mm 20mm 20mm 25mm;
+            }
+            body {
+              font-family: '${pageSettings.fontFamily}', serif;
+              font-size: ${pageSettings.fontSize};
+              line-height: ${pageSettings.lineHeight};
+              color: #0f172a;
+              margin: 0;
+              padding: 0;
+              position: relative;
+            }
+            pre {
+              white-space: pre-wrap;
+              font-family: inherit;
+              font-size: inherit;
+              line-height: inherit;
+              margin: 0;
+              text-align: justify;
+            }
+            .watermark {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(-45deg);
+              font-size: 55pt;
+              color: rgba(148, 163, 184, 0.15);
+              font-weight: bold;
+              pointer-events: none;
+              z-index: -1;
+              white-space: nowrap;
+              letter-spacing: 4px;
+            }
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
           </style>
         </head>
         <body>
+          ${marcaDaguaHtml}
+          ${cabecalhoHtml}
           <pre>${renderedContent}</pre>
+          ${rodapeHtml}
           <script>
-            window.onload = function() { window.print(); window.close(); }
+            window.onload = function() {
+              window.print();
+              window.close();
+            };
           </script>
         </body>
       </html>
@@ -137,39 +220,131 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden text-xs">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden text-xs">
         
-        {/* Cabeçalho */}
-        <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+        {/* Cabeçalho do Modal */}
+        <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
               <Sparkles className="h-4 w-4 text-indigo-400" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                Gerador de Peças a partir de Modelos
+                Emissão de Minutas e Papel Timbrado
               </h2>
               <p className="text-[11px] text-slate-500 font-mono">
-                Autos: {process.number} • Cliente: {clientData?.name || process.plaintiff || 'Vinculado'}
+                Autos: {process.number} • Parte: {clientData?.name || process.plaintiff || 'Vinculada'}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPainelConfigAberto(!painelConfigAberto)}
+              className={`px-3 py-1.5 rounded-md border text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs ${
+                painelConfigAberto
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              <span>Configurar Timbrado</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Corpo com Split: Modelos à Esquerda, Preview à Direita */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-100/50">
+        {/* Painel Retrátil de Configuração da Página */}
+        {painelConfigAberto && (
+          <div className="bg-slate-900 text-slate-200 p-4 border-b border-slate-800 animate-in slide-in-from-top-2 duration-150 shrink-0 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tipografia</label>
+                <select
+                  value={pageSettings.fontFamily}
+                  onChange={(e) => setPageSettings({ ...pageSettings, fontFamily: e.target.value as any })}
+                  className="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200 focus:outline-hidden"
+                >
+                  <option value="Times New Roman">Times New Roman (Forense Padrão)</option>
+                  <option value="Arial">Arial (Moderna)</option>
+                  <option value="Calibri">Calibri</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tamanho & Entrelinhas</label>
+                <div className="flex gap-2">
+                  <select
+                    value={pageSettings.fontSize}
+                    onChange={(e) => setPageSettings({ ...pageSettings, fontSize: e.target.value })}
+                    className="w-1/2 px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200"
+                  >
+                    <option value="11pt">11 pt</option>
+                    <option value="12pt">12 pt (Padrão)</option>
+                    <option value="13pt">13 pt</option>
+                  </select>
+                  <select
+                    value={pageSettings.lineHeight}
+                    onChange={(e) => setPageSettings({ ...pageSettings, lineHeight: e.target.value })}
+                    className="w-1/2 px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200"
+                  >
+                    <option value="1.2">1.2 (Simples)</option>
+                    <option value="1.5">1.5 (CPC/ABNT)</option>
+                    <option value="1.8">1.8 (Espaçado)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Marca d'Água (Plano de Fundo)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: MINUTA, CONFIDENCIAL"
+                  value={pageSettings.marcaDaguaTexto}
+                  onChange={(e) => setPageSettings({ ...pageSettings, marcaDaguaTexto: e.target.value })}
+                  className="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200 uppercase font-mono text-[11px]"
+                />
+              </div>
+
+              <div className="flex items-center gap-4 pt-4">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pageSettings.exibirCabecalho}
+                    onChange={(e) => setPageSettings({ ...pageSettings, exibirCabecalho: e.target.checked })}
+                    className="rounded border-slate-700 text-indigo-500"
+                  />
+                  <span>Cabeçalho</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pageSettings.exibirRodape}
+                    onChange={(e) => setPageSettings({ ...pageSettings, exibirRodape: e.target.checked })}
+                    className="rounded border-slate-700 text-indigo-500"
+                  />
+                  <span>Rodapé</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Corpo com Split: Modelos à Esquerda, Folha A4 à Direita */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-200/70">
           
           {/* Coluna Esquerda: Lista de Modelos */}
-          <div className="w-full md:w-64 border-r border-slate-200 bg-white p-3 overflow-y-auto space-y-1.5 shrink-0">
+          <div className="w-full md:w-60 border-r border-slate-200 bg-white p-3 overflow-y-auto space-y-1.5 shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-2 mb-2">
-              Modelos do Escritório
+              Modelos Prontos
             </span>
 
             {loadingTemplates ? (
@@ -200,18 +375,20 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
             )}
           </div>
 
-          {/* Coluna Direita: Editor / Preview do Documento Gerado */}
-          <div className="flex-1 flex flex-col overflow-hidden p-3.5 bg-slate-50">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
-              <span className="text-[11px] font-semibold text-slate-700">
-                Pré-visualização da Peça Gerada (Pode editar diretamente abaixo):
+          {/* Coluna Direita: Simulação Real de Folha A4 */}
+          <div className="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 items-center">
+            
+            {/* Barra Rápida de Ações do Documento */}
+            <div className="w-full max-w-[210mm] flex items-center justify-between pb-3 mb-2">
+              <span className="text-xs font-semibold text-slate-700">
+                Pré-visualização da Folha de Impressão (A4):
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-xs font-medium flex items-center gap-1 shadow-2xs"
-                  title="Copiar texto formatado"
+                  className="px-2.5 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded text-xs font-medium flex items-center gap-1 shadow-2xs"
+                  title="Copiar texto"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
                   <span>{copied ? 'Copiado!' : 'Copiar'}</span>
@@ -219,35 +396,79 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-xs font-medium flex items-center gap-1 shadow-2xs"
-                  title="Imprimir ou Salvar em PDF"
+                  className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded text-xs font-medium flex items-center gap-1.5 shadow-2xs"
+                  title="Imprimir com Papel Timbrado"
                 >
-                  <Printer className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Imprimir / PDF</span>
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir em A4</span>
                 </button>
               </div>
             </div>
 
-            {/* Editor de Texto Simples da Peça */}
-            <textarea
-              value={renderedContent}
-              onChange={(e) => setRenderedContent(e.target.value)}
-              className="flex-1 w-full p-4 border border-slate-200 rounded-lg font-mono text-xs text-slate-800 bg-white leading-relaxed focus:outline-hidden focus:border-slate-400 shadow-2xs resize-none overflow-y-auto"
-              placeholder="O conteúdo do modelo aparecerá aqui..."
-            />
+            {/* Folha A4 Renderizada */}
+            <div 
+              className="w-full max-w-[210mm] min-h-[297mm] bg-white border border-slate-300 rounded shadow-md p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden"
+              style={{
+                fontFamily: pageSettings.fontFamily,
+                fontSize: pageSettings.fontSize,
+                lineHeight: pageSettings.lineHeight
+              }}
+            >
+              {/* Marca d'água no preview da folha */}
+              {pageSettings.marcaDaguaTexto && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                  <span className="text-slate-200 font-bold text-6xl tracking-widest uppercase transform -rotate-45">
+                    {pageSettings.marcaDaguaTexto}
+                  </span>
+                </div>
+              )}
+
+              {/* Cabeçalho da Folha */}
+              {pageSettings.exibirCabecalho && (
+                <div className="border-b-2 border-slate-900 pb-2 mb-6 flex justify-between items-end relative z-10">
+                  <div>
+                    <h3 className="font-bold text-slate-900 tracking-wide text-sm">{pageSettings.escritorioNome}</h3>
+                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">{pageSettings.escritorioOab}</p>
+                  </div>
+                  <div className="text-[9px] font-mono text-slate-400 text-right">
+                    Processo: {process.number}
+                  </div>
+                </div>
+              )}
+
+              {/* Corpo da Minuta (Editável diretamente na folha) */}
+              <textarea
+                value={renderedContent}
+                onChange={(e) => setRenderedContent(e.target.value)}
+                className="w-full flex-1 border-none focus:outline-hidden resize-none bg-transparent text-justify text-slate-900 relative z-10 p-0 leading-relaxed"
+                style={{
+                  fontFamily: 'inherit',
+                  fontSize: 'inherit',
+                  lineHeight: 'inherit'
+                }}
+              />
+
+              {/* Rodapé da Folha */}
+              {pageSettings.exibirRodape && (
+                <div className="border-t border-slate-200 pt-3 mt-8 text-center text-[9px] text-slate-400 font-mono relative z-10">
+                  <p>{pageSettings.escritorioEndereco} • {pageSettings.escritorioContato}</p>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
 
-        {/* Rodapé de Ações */}
+        {/* Rodapé do Modal */}
         <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-slate-400">
-            As variáveis dinâmicas foram substituídas automaticamente com os dados do processo e do cliente.
+            Ajuste margens, tipografia e dados timbrados no botão superior antes de mandar para a impressora.
           </span>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-100"
+              className="px-3.5 py-1.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-100"
             >
               Fechar
             </button>
@@ -262,7 +483,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
               ) : (
                 <Save className="w-3.5 h-3.5" />
               )}
-              <span>Salvar na Pasta Digital</span>
+              <span>Salvar nos Autos</span>
             </button>
           </div>
         </div>

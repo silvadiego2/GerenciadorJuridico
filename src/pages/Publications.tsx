@@ -1,457 +1,293 @@
+// src/pages/Publications.tsx
 import React, { useState } from 'react';
 import { 
   BookOpen, Search, Filter, Eye, CheckCircle, Clock, 
-  AlertTriangle, Download, Bell, Calendar, User,
-  ExternalLink, Tag, RefreshCw, Loader2
+  AlertTriangle, Bell, Calendar, User,
+  ExternalLink, RefreshCw, Loader2, Scale
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { publicationsService } from '../lib/api';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNotifications } from '../hooks/useNotifications';
 import { useDebounce } from '../hooks/useDebounce';
 
-interface Publication {
-  id: string;
-  date: string;
-  content: string;
-  source: 'dje-ba' | 'dou' | 'dje-trt' | 'dje-trf';
-  process_id?: string;
-  oab_numbers: string[];
-  type: 'intimacao' | 'citacao' | 'publicacao' | 'edital' | 'despacho';
-  priority: 'baixa' | 'media' | 'alta' | 'urgente';
-  deadline?: string;
-  acknowledged: boolean;
-  acknowledged_at?: string;
-  acknowledged_by?: string;
-  read: boolean;
-  responsible_id?: string;
-  tags: string[];
-  created_at: string;
-  // Relacionamentos vindos do backend
-  process?: {
-    id: string;
-    number: string;
-    subject: string;
-  };
-  responsible?: {
-    id: string;
-    name: string;
-  };
-}
-
 const Publications: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSource, setSelectedSource] = useState<'all' | 'dje-ba' | 'dou' | 'dje-trt' | 'dje-trf'>('all');
-  const [selectedType, setSelectedType] = useState<'all' | 'intimacao' | 'citacao' | 'publicacao' | 'edital' | 'despacho'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'nao_lida' | 'lida' | 'nao_ciente' | 'ciente'>('all');
-  const [selectedPriority, setSelectedPriority] = useState<'all' | 'baixa' | 'media' | 'alta' | 'urgente'>('all');
-  
+  const [viewingPub, setViewingPub] = useState<any | null>(null);
+
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
 
-  // Query para buscar publicações
-  const { data: publicationsData, isLoading, error: queryError } = useQuery({
-    queryKey: ['publications', debouncedSearchTerm, selectedSource, selectedType, selectedStatus, selectedPriority],
+  const { data: publicationsData, isLoading, isFetching, error: queryError } = useQuery({
+    queryKey: ['publications', debouncedSearchTerm, selectedStatus],
     queryFn: () => {
       const params: Record<string, string> = {};
-      
       if (debouncedSearchTerm) params.search = debouncedSearchTerm;
-      if (selectedSource !== 'all') params.source = selectedSource;
-      if (selectedType !== 'all') params.type = selectedType;
-      if (selectedPriority !== 'all') params.priority = selectedPriority;
-      
-      // Mapear status para parâmetros do backend
       if (selectedStatus === 'nao_lida') params.read = 'false';
       else if (selectedStatus === 'lida') params.read = 'true';
       else if (selectedStatus === 'nao_ciente') params.acknowledged = 'false';
       else if (selectedStatus === 'ciente') params.acknowledged = 'true';
-      
       return publicationsService.getAll(params);
     },
-    staleTime: 2 * 60 * 1000, // 2 minutos
+    staleTime: 2 * 60 * 1000,
   });
 
   const publications = publicationsData?.publications || [];
 
-  // Mutation para dar ciência
   const acknowledgeMutation = useMutation({
     mutationFn: publicationsService.acknowledge,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['publications'] });
-      success('Sucesso', 'Ciência registrada com sucesso!');
+      success('Sucesso', 'Ciência processual registrada');
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao dar ciência');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao registrar ciência')
   });
 
-  // Mutation para marcar como lida
   const markAsReadMutation = useMutation({
     mutationFn: publicationsService.markAsRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['publications'] });
-    },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao marcar como lida');
-    },
+    }
   });
 
-  const handleAcknowledge = (publicationId: string) => {
-    acknowledgeMutation.mutate(publicationId);
-  };
-
-  const handleMarkAsRead = (publicationId: string) => {
-    if (!publications.find(p => p.id === publicationId)?.read) {
-      markAsReadMutation.mutate(publicationId);
+  const handleOpenPub = (pub: any) => {
+    setViewingPub(pub);
+    if (!pub.read) {
+      markAsReadMutation.mutate(pub.id);
     }
   };
 
-  const getSourceName = (source: string) => {
-    switch (source) {
-      case 'dje-ba': return 'DJE-BA';
-      case 'dou': return 'DOU';
-      case 'dje-trt': return 'DJE-TRT';
-      case 'dje-trf': return 'DJE-TRF';
-      default: return source.toUpperCase();
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'intimacao': return 'bg-orange-100 text-orange-800';
-      case 'citacao': return 'bg-blue-100 text-blue-800';
-      case 'publicacao': return 'bg-green-100 text-green-800';
-      case 'edital': return 'bg-purple-100 text-purple-800';
-      case 'despacho': return 'bg-indigo-100 text-indigo-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgente': return 'bg-red-50 text-red-700 border-red-200';
-      case 'alta': return 'bg-orange-50 text-orange-700 border-orange-200';
-      case 'media': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-      case 'baixa': return 'bg-green-50 text-green-700 border-green-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
-    }
-  };
-
-  const getUrgencyStatus = (publication: Publication) => {
-    if (!publication.deadline) return null;
-    
-    const now = new Date();
-    const deadline = new Date(publication.deadline);
-    
-    if (isBefore(deadline, now)) {
-      return { type: 'overdue', label: 'Prazo vencido', color: 'text-red-600' };
-    } else if (isBefore(deadline, addDays(now, 3))) {
-      return { type: 'urgent', label: 'Vence em breve', color: 'text-orange-600' };
-    } else {
-      return { type: 'normal', label: 'No prazo', color: 'text-green-600' };
-    }
-  };
-
-  // Calcular estatísticas dinamicamente
   const unreadCount = publications.filter(p => !p.read).length;
   const unacknowledgedCount = publications.filter(p => !p.acknowledged).length;
-  const todayCount = publications.filter(p => 
-    format(new Date(p.date), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-  ).length;
 
   if (queryError) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Erro ao carregar publicações: {(queryError as Error).message}</p>
+      <div className="p-4 sm:p-6">
+        <div className="bg-rose-50 border border-rose-200 rounded-md p-4 text-xs text-rose-800">
+          Erro ao carregar publicações: {(queryError as Error).message}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4">
+      {/* Topo */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Publicações</h1>
-          <p className="text-gray-600">Monitoramento de diários oficiais e intimações</p>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Publicações e Intimações</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Leitura automática de diários oficiais e e-mails processuais</p>
         </div>
-        <div className="flex space-x-3">
+
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => queryClient.invalidateQueries({ queryKey: ['publications'] })}
-            disabled={isLoading}
-            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors flex items-center space-x-2"
+            disabled={isFetching}
+            className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${isFetching ? 'animate-spin' : ''}`} />
             <span>Atualizar</span>
-          </button>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
-            <Bell className="h-4 w-4" />
-            <span>Configurar Alertas</span>
           </button>
         </div>
       </div>
 
-      {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Não Lidas</p>
-              <p className="text-2xl font-bold text-red-600">{unreadCount}</p>
-            </div>
-            <div className="bg-red-100 p-3 rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
-            </div>
-          </div>
+      {/* Indicadores Compactos */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Total Recebidas</span>
+          <p className="mt-1 text-xl font-bold font-mono text-slate-900">{publications.length}</p>
         </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Sem Ciência</p>
-              <p className="text-2xl font-bold text-orange-600">{unacknowledgedCount}</p>
-            </div>
-            <div className="bg-orange-100 p-3 rounded-lg">
-              <Clock className="h-6 w-6 text-orange-600" />
-            </div>
-          </div>
+        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Não Lidas</span>
+          <p className={`mt-1 text-xl font-bold font-mono ${unreadCount > 0 ? 'text-sky-700' : 'text-slate-900'}`}>{unreadCount}</p>
         </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Hoje</p>
-              <p className="text-2xl font-bold text-blue-600">{todayCount}</p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-lg">
-              <BookOpen className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
+        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Aguardando Ciência</span>
+          <p className={`mt-1 text-xl font-bold font-mono ${unacknowledgedCount > 0 ? 'text-amber-700' : 'text-slate-900'}`}>{unacknowledgedCount}</p>
         </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Mês</p>
-              <p className="text-2xl font-bold text-green-600">{publications.length}</p>
-            </div>
-            <div className="bg-green-100 p-3 rounded-lg">
-              <CheckCircle className="h-6 w-6 text-green-600" />
-            </div>
-          </div>
+        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Origem do Monitoramento</span>
+          <p className="mt-1 text-xs font-medium text-slate-700">Gmail Script / Projudi</p>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Buscar publicações..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <select
-            value={selectedSource}
-            onChange={(e) => setSelectedSource(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todas as fontes</option>
-            <option value="dje-ba">DJE-BA</option>
-            <option value="dou">DOU</option>
-            <option value="dje-trt">DJE-TRT</option>
-            <option value="dje-trf">DJE-TRF</option>
-          </select>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todos os tipos</option>
-            <option value="intimacao">Intimação</option>
-            <option value="citacao">Citação</option>
-            <option value="publicacao">Publicação</option>
-            <option value="edital">Edital</option>
-            <option value="despacho">Despacho</option>
-          </select>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todos os status</option>
-            <option value="nao_lida">Não lidas</option>
-            <option value="lida">Lidas</option>
-            <option value="nao_ciente">Sem ciência</option>
-            <option value="ciente">Com ciência</option>
-          </select>
-          <select
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todas as prioridades</option>
-            <option value="urgente">Urgente</option>
-            <option value="alta">Alta</option>
-            <option value="media">Média</option>
-            <option value="baixa">Baixa</option>
-          </select>
+      <div className="bg-white p-3 rounded-lg border border-slate-200 flex flex-col sm:flex-row gap-2.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por teor da publicação ou número de processo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+          />
         </div>
+
+        <select
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value as any)}
+          className="px-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
+        >
+          <option value="all">Todos os status</option>
+          <option value="nao_lida">Não lidas</option>
+          <option value="lida">Lidas</option>
+          <option value="nao_ciente">Sem ciência</option>
+          <option value="ciente">Com ciência</option>
+        </select>
       </div>
 
       {/* Lista de Publicações */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {isLoading ? 'Carregando...' : `${publications.length} publicação${publications.length !== 1 ? 'ões' : ''} encontrada${publications.length !== 1 ? 's' : ''}`}
-            </h2>
-            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
-          </div>
-        </div>
-
+      <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-500">Carregando publicações...</p>
+          <div className="p-12 text-center text-slate-400 text-xs">
+            <Loader2 className="h-5 w-5 animate-spin text-slate-600 mx-auto mb-2" />
+            Carregando publicações...
+          </div>
+        ) : publications.length === 0 ? (
+          <div className="p-12 text-center text-slate-400">
+            <BookOpen className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-xs font-medium text-slate-700">Nenhuma publicação registrada</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">As notificações do tribunal recebidas por e-mail aparecerão aqui.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {publications.map((publication) => {
-              const urgency = getUrgencyStatus(publication);
+          <div className="divide-y divide-slate-100">
+            {publications.map((pub: any) => {
+              const numProcesso = pub.process_number || pub.process?.number || 'Processo não identificado';
+              const dataPub = pub.publication_date || pub.date || pub.created_at;
+
               return (
                 <div 
-                  key={publication.id} 
-                  className={`p-6 hover:bg-gray-50 transition-colors ${
-                    !publication.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                  key={pub.id}
+                  onClick={() => handleOpenPub(pub)}
+                  className={`p-4 hover:bg-slate-50/80 transition-colors cursor-pointer ${
+                    !pub.read ? 'bg-sky-50/40 border-l-2 border-l-sky-600' : ''
                   }`}
-                  onClick={() => handleMarkAsRead(publication.id)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <BookOpen className="h-6 w-6 text-blue-600" />
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
+                          {numProcesso}
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          {pub.court || 'TJ-BA'}
+                        </span>
+                        {!pub.acknowledged ? (
+                          <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                            Sem ciência
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                            Ciência registrada
+                          </span>
+                        )}
+                        {!pub.read && (
+                          <span className="text-[10px] font-semibold text-sky-800 bg-sky-100 px-1.5 py-0.5 rounded">
+                            Nova
+                          </span>
+                        )}
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <span className={`px-2 py-1 text-xs rounded-full ${getTypeColor(publication.type)}`}>
-                            {publication.type.charAt(0).toUpperCase() + publication.type.slice(1)}
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                            {getSourceName(publication.source)}
-                          </span>
-                          <span className={`px-2 py-1 rounded-md border text-xs ${getPriorityColor(publication.priority)}`}>
-                            {publication.priority.charAt(0).toUpperCase() + publication.priority.slice(1)}
-                          </span>
-                          {!publication.read && (
-                            <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
-                              Não lida
-                            </span>
-                          )}
-                          {!publication.acknowledged && (
-                            <span className="px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-800">
-                              Sem ciência
-                            </span>
-                          )}
-                        </div>
-                        
-                        <p className="text-sm text-gray-900 mb-3 leading-relaxed">
-                          {publication.content}
-                        </p>
-                        
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>{format(new Date(publication.date), "dd/MM/yyyy", { locale: ptBR })}</span>
-                          </div>
-                          {publication.process && (
-                            <span className="font-mono">{publication.process.number}</span>
-                          )}
-                          {publication.responsible && (
-                            <div className="flex items-center space-x-1">
-                              <User className="h-4 w-4" />
-                              <span>{publication.responsible.name}</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {publication.deadline && urgency && (
-                          <div className="flex items-center space-x-2 mb-2">
-                            <Clock className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm text-gray-600">
-                              Prazo: {format(new Date(publication.deadline), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                            </span>
-                            <span className={`text-sm font-medium ${urgency.color}`}>
-                              ({urgency.label})
-                            </span>
-                          </div>
-                        )}
-                        
-                        {publication.tags && publication.tags.length > 0 && (
-                          <div className="flex items-center space-x-2">
-                            <Tag className="h-4 w-4 text-gray-400" />
-                            <div className="flex space-x-1">
-                              {publication.tags.map((tag, index) => (
-                                <span key={index} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+
+                      <p className="text-xs text-slate-700 line-clamp-3 leading-relaxed">
+                        {pub.content}
+                      </p>
+
+                      <div className="flex items-center gap-3 text-[11px] text-slate-400 pt-1">
+                        <span>Publicado em: {dataPub ? format(new Date(dataPub), "dd/MM/yyyy", { locale: ptBR }) : '-'}</span>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-2 ml-4">
-                      {!publication.acknowledged && (
-                        <button 
+
+                    <div className="flex items-center gap-2 sm:self-center shrink-0">
+                      {!pub.acknowledged && (
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleAcknowledge(publication.id);
+                            acknowledgeMutation.mutate(pub.id);
                           }}
                           disabled={acknowledgeMutation.isPending}
-                          className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 disabled:opacity-50 transition-colors"
+                          className="px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors"
                         >
-                          {acknowledgeMutation.isPending ? 'Dando ciência...' : 'Dar Ciência'}
+                          Dar Ciência
                         </button>
                       )}
-                      <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenPub(pub);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded"
+                        title="Ver conteúdo completo"
+                      >
                         <Eye className="h-4 w-4" />
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
-                        <Download className="h-4 w-4" />
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
-                        <ExternalLink className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
                 </div>
               );
             })}
-            
-            {publications.length === 0 && !isLoading && (
-              <div className="p-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <BookOpen className="h-8 w-8 text-gray-400" />
-                </div>
-                <p className="text-gray-500">Nenhuma publicação encontrada</p>
-                <p className="text-gray-400 text-sm mt-2">
-                  As publicações aparecerão aqui quando forem capturadas automaticamente dos diários oficiais
-                </p>
-              </div>
-            )}
           </div>
         )}
       </div>
+
+      {/* Modal de Leitura Integral do Despacho/Publicação */}
+      {viewingPub && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-lg border border-slate-200 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div>
+                <span className="text-[10px] font-mono uppercase text-slate-400">Intimação Judicial</span>
+                <p className="font-mono text-xs font-bold text-slate-900">{viewingPub.process_number || 'Sem autos vinculados'}</p>
+              </div>
+              <button 
+                onClick={() => setViewingPub(null)}
+                className="text-slate-400 hover:text-slate-700 text-xs font-bold px-2 py-1 rounded"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-3 text-xs flex-1">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded text-slate-600 space-y-1">
+                <p><strong>Tribunal / Diário:</strong> {viewingPub.court || 'TJ-BA'}</p>
+                <p><strong>Data de Notificação:</strong> {viewingPub.publication_date ? format(new Date(viewingPub.publication_date), "dd/MM/yyyy HH:mm", { locale: ptBR }) : '-'}</p>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Teor do Despacho / Publicação</span>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded font-mono text-[11px] text-slate-800 whitespace-pre-wrap leading-relaxed">
+                  {viewingPub.content}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+              <div>
+                {!viewingPub.acknowledged && (
+                  <button
+                    onClick={() => {
+                      acknowledgeMutation.mutate(viewingPub.id);
+                      setViewingPub({ ...viewingPub, acknowledged: true });
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold bg-emerald-700 text-white rounded hover:bg-emerald-800"
+                  >
+                    Registrar Ciência
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setViewingPub(null)}
+                className="px-3 py-1.5 text-xs font-medium border border-slate-300 text-slate-700 rounded bg-white hover:bg-slate-100"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

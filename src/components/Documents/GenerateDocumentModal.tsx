@@ -1,8 +1,10 @@
 // src/components/Documents/GenerateDocumentModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, FileText, Copy, Printer, Check, 
-  Sparkles, Save, Loader2, Settings2, Scale
+  Sparkles, Save, Loader2, Settings2, Upload,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify,
+  Image as ImageIcon, Trash2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
@@ -24,14 +26,22 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
   const [renderedContent, setRenderedContent] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [painelConfigAberto, setPainelConfigAberto] = useState(false);
+  
+  // Alinhamento manual de texto
+  const [textAlign, setTextAlign] = useState<'justify' | 'left' | 'center' | 'right'>('justify');
 
-  // Configurações do Papel Timbrado / Página
+  // Timbrado em imagem (Base64)
+  const [timbradoImage, setTimbradoImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Configurações da Página A4
   const [pageSettings, setPageSettings] = useState({
     fontFamily: 'Times New Roman' as 'Times New Roman' | 'Arial' | 'Calibri',
     fontSize: '12pt',
     lineHeight: '1.5',
     exibirCabecalho: true,
     exibirRodape: true,
+    posicaoLogo: 'split' as 'left' | 'center' | 'split',
     marcaDaguaTexto: '',
     escritorioNome: 'SILVA ADVOCACIA & CONSULTORIA JURÍDICA',
     escritorioOab: 'OAB/BA nº 12.345',
@@ -42,7 +52,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
 
-  // 1. Carrega os modelos disponíveis
+  // Carrega os modelos cadastrados
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ['document-templates'],
     queryFn: async () => {
@@ -55,7 +65,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     }
   });
 
-  // 2. Busca dados completos do cliente
+  // Busca dados completos do cliente
   const { data: clientData } = useQuery({
     queryKey: ['client-for-template', process?.client_id || process?.clientId],
     queryFn: async () => {
@@ -87,6 +97,22 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
       setRenderedContent(interpolated);
     }
   }, [selectedTemplateId, templates, process, clientData]);
+
+  // Upload local de imagem de timbrado
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('A imagem do timbrado deve ter até 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setTimbradoImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Salvar na Pasta Digital
   const saveDocumentMutation = useMutation({
@@ -126,30 +152,42 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Motor de Impressão Direta A4 com Estilos de Impressão (@media print)
+  // Motor de Impressão Direta A4 com Timbrado e Alinhamento
   const handlePrint = () => {
     const win = window.open('', '', 'width=850,height=950');
     if (!win) return;
 
-    const cabecalhoHtml = pageSettings.exibirCabecalho ? `
-      <div class="print-header">
-        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 24px;">
-          <div>
-            <h1 style="font-size: 13pt; font-weight: bold; margin: 0; color: #0f172a; letter-spacing: 0.5px;">${pageSettings.escritorioNome}</h1>
-            <p style="font-size: 9.5pt; color: #475569; margin: 2px 0 0 0;">${pageSettings.escritorioOab}</p>
+    let cabecalhoHtml = '';
+    if (pageSettings.exibirCabecalho) {
+      if (pageSettings.posicaoLogo === 'center' && timbradoImage) {
+        cabecalhoHtml = `
+          <div class="print-header" style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 24px;">
+            <img src="${timbradoImage}" style="max-height: 70px; margin-bottom: 6px;" />
+            <h1 style="font-size: 12pt; font-weight: bold; margin: 0; color: #0f172a;">${pageSettings.escritorioNome}</h1>
+            <p style="font-size: 9pt; color: #475569; margin: 2px 0 0 0;">${pageSettings.escritorioOab}</p>
           </div>
-          <div style="font-size: 8pt; font-family: monospace; color: #64748b; text-align: right;">
-            Autos nº ${process.number}
+        `;
+      } else {
+        cabecalhoHtml = `
+          <div class="print-header" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              ${timbradoImage ? `<img src="${timbradoImage}" style="max-height: 55px; max-width: 140px; object-fit: contain;" />` : ''}
+              <div>
+                <h1 style="font-size: 12pt; font-weight: bold; margin: 0; color: #0f172a; letter-spacing: 0.5px;">${pageSettings.escritorioNome}</h1>
+                <p style="font-size: 9pt; color: #475569; margin: 2px 0 0 0;">${pageSettings.escritorioOab}</p>
+              </div>
+            </div>
+            <div style="font-size: 8pt; font-family: monospace; color: #64748b; text-align: right;">
+              Autos nº ${process.number}
+            </div>
           </div>
-        </div>
-      </div>
-    ` : '';
+        `;
+      }
+    }
 
     const rodapeHtml = pageSettings.exibirRodape ? `
-      <div class="print-footer">
-        <div style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin-top: 30px; font-size: 8pt; color: #64748b; text-align: center; line-height: 1.4;">
-          <p style="margin: 0;">${pageSettings.escritorioEndereco} • ${pageSettings.escritorioContato}</p>
-        </div>
+      <div class="print-footer" style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin-top: 32px; font-size: 8pt; color: #64748b; text-align: center; line-height: 1.4;">
+        <p style="margin: 0;">${pageSettings.escritorioEndereco} • ${pageSettings.escritorioContato}</p>
       </div>
     ` : '';
 
@@ -182,7 +220,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
               font-size: inherit;
               line-height: inherit;
               margin: 0;
-              text-align: justify;
+              text-align: ${textAlign};
             }
             .watermark {
               position: fixed;
@@ -221,9 +259,9 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden text-xs">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-5xl h-[94vh] flex flex-col overflow-hidden text-xs">
         
-        {/* Cabeçalho do Modal */}
+        {/* Cabeçalho Superior */}
         <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
@@ -250,7 +288,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
               }`}
             >
               <Settings2 className="h-3.5 w-3.5" />
-              <span>Configurar Timbrado</span>
+              <span>Configurar Timbrado & Folha</span>
             </button>
 
             <button
@@ -262,10 +300,48 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
           </div>
         </div>
 
-        {/* Painel Retrátil de Configuração da Página */}
+        {/* Painel de Configurações e Upload */}
         {painelConfigAberto && (
           <div className="bg-slate-900 text-slate-200 p-4 border-b border-slate-800 animate-in slide-in-from-top-2 duration-150 shrink-0 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              
+              {/* Upload de Imagem */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  Logo / Imagem do Timbrado
+                </label>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleImageUpload} 
+                  accept="image/png,image/jpeg,image/svg+xml" 
+                  className="hidden" 
+                />
+                {timbradoImage ? (
+                  <div className="flex items-center gap-2 bg-slate-800 p-1.5 rounded border border-slate-700">
+                    <img src={timbradoImage} alt="Timbrado" className="h-7 w-auto max-w-[80px] object-contain rounded bg-white p-0.5" />
+                    <button
+                      type="button"
+                      onClick={() => setTimbradoImage(null)}
+                      className="text-rose-400 hover:text-rose-300 p-1 ml-auto"
+                      title="Remover logo"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-1.5 px-2 bg-slate-800 border border-dashed border-slate-700 hover:border-slate-500 rounded text-slate-300 flex items-center justify-center gap-1.5 transition text-[11px]"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Carregar Brasão / Logo</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Tipografia */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tipografia</label>
                 <select
@@ -279,6 +355,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 </select>
               </div>
 
+              {/* Tamanho e Entrelinhas */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tamanho & Entrelinhas</label>
                 <div className="flex gap-2">
@@ -303,8 +380,9 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 </div>
               </div>
 
+              {/* Marca D'Água */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Marca d'Água (Plano de Fundo)</label>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Marca d'Água Central</label>
                 <input
                   type="text"
                   placeholder="Ex: MINUTA, CONFIDENCIAL"
@@ -314,7 +392,11 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center gap-4 pt-4">
+            </div>
+
+            {/* Segunda linha de opções */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-800 text-[11px]">
+              <div className="flex items-center gap-4">
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"
@@ -322,7 +404,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                     onChange={(e) => setPageSettings({ ...pageSettings, exibirCabecalho: e.target.checked })}
                     className="rounded border-slate-700 text-indigo-500"
                   />
-                  <span>Cabeçalho</span>
+                  <span>Cabeçalho Ativo</span>
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
@@ -331,9 +413,29 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                     onChange={(e) => setPageSettings({ ...pageSettings, exibirRodape: e.target.checked })}
                     className="rounded border-slate-700 text-indigo-500"
                   />
-                  <span>Rodapé</span>
+                  <span>Rodapé Institucional</span>
                 </label>
               </div>
+
+              {timbradoImage && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Posição do Timbrado:</span>
+                  <button
+                    type="button"
+                    onClick={() => setPageSettings({ ...pageSettings, posicaoLogo: 'split' })}
+                    className={`px-2 py-0.5 rounded ${pageSettings.posicaoLogo === 'split' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                  >
+                    Lateral
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageSettings({ ...pageSettings, posicaoLogo: 'center' })}
+                    className={`px-2 py-0.5 rounded ${pageSettings.posicaoLogo === 'center' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                  >
+                    Topo Central
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -341,10 +443,10 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
         {/* Corpo com Split: Modelos à Esquerda, Folha A4 à Direita */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-200/70">
           
-          {/* Coluna Esquerda: Lista de Modelos */}
+          {/* Coluna Esquerda: Modelos */}
           <div className="w-full md:w-60 border-r border-slate-200 bg-white p-3 overflow-y-auto space-y-1.5 shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-2 mb-2">
-              Modelos Prontos
+              Modelos do Escritório
             </span>
 
             {loadingTemplates ? (
@@ -375,14 +477,47 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
             )}
           </div>
 
-          {/* Coluna Direita: Simulação Real de Folha A4 */}
+          {/* Coluna Direita: Folha A4 e Barra de Alinhamento */}
           <div className="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 items-center">
             
-            {/* Barra Rápida de Ações do Documento */}
-            <div className="w-full max-w-[210mm] flex items-center justify-between pb-3 mb-2">
-              <span className="text-xs font-semibold text-slate-700">
-                Pré-visualização da Folha de Impressão (A4):
-              </span>
+            {/* Barra de Ferramentas da Folha (Alinhamento & Impressão) */}
+            <div className="w-full max-w-[210mm] flex items-center justify-between pb-3 mb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-1 bg-white p-1 rounded-md border border-slate-300 shadow-2xs">
+                <span className="text-[10px] uppercase font-bold text-slate-400 px-1.5">Alinhamento:</span>
+                <button
+                  type="button"
+                  onClick={() => setTextAlign('justify')}
+                  className={`p-1 rounded ${textAlign === 'justify' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                  title="Justificar Texto"
+                >
+                  <AlignJustify className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTextAlign('left')}
+                  className={`p-1 rounded ${textAlign === 'left' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                  title="Alinhar à Esquerda"
+                >
+                  <AlignLeft className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTextAlign('center')}
+                  className={`p-1 rounded ${textAlign === 'center' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                  title="Centralizar Texto"
+                >
+                  <AlignCenter className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTextAlign('right')}
+                  className={`p-1 rounded ${textAlign === 'right' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                  title="Alinhar à Direita"
+                >
+                  <AlignRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
@@ -405,7 +540,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
               </div>
             </div>
 
-            {/* Folha A4 Renderizada */}
+            {/* Simulação da Folha A4 */}
             <div 
               className="w-full max-w-[210mm] min-h-[297mm] bg-white border border-slate-300 rounded shadow-md p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden"
               style={{
@@ -414,7 +549,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 lineHeight: pageSettings.lineHeight
               }}
             >
-              {/* Marca d'água no preview da folha */}
+              {/* Marca D'Água */}
               {pageSettings.marcaDaguaTexto && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
                   <span className="text-slate-200 font-bold text-6xl tracking-widest uppercase transform -rotate-45">
@@ -425,26 +560,40 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
 
               {/* Cabeçalho da Folha */}
               {pageSettings.exibirCabecalho && (
-                <div className="border-b-2 border-slate-900 pb-2 mb-6 flex justify-between items-end relative z-10">
-                  <div>
-                    <h3 className="font-bold text-slate-900 tracking-wide text-sm">{pageSettings.escritorioNome}</h3>
-                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">{pageSettings.escritorioOab}</p>
+                <div className={`border-b-2 border-slate-900 pb-3 mb-6 relative z-10 ${
+                  pageSettings.posicaoLogo === 'center' && timbradoImage ? 'text-center' : 'flex justify-between items-end'
+                }`}>
+                  <div className={pageSettings.posicaoLogo === 'split' ? 'flex items-center gap-3.5' : ''}>
+                    {timbradoImage && (
+                      <img 
+                        src={timbradoImage} 
+                        alt="Logo" 
+                        className={`object-contain ${pageSettings.posicaoLogo === 'center' ? 'max-h-16 mx-auto mb-2' : 'max-h-12 max-w-[140px]'}`} 
+                      />
+                    )}
+                    <div>
+                      <h3 className="font-bold text-slate-900 tracking-wide text-sm">{pageSettings.escritorioNome}</h3>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">{pageSettings.escritorioOab}</p>
+                    </div>
                   </div>
-                  <div className="text-[9px] font-mono text-slate-400 text-right">
-                    Processo: {process.number}
-                  </div>
+                  {pageSettings.posicaoLogo !== 'center' && (
+                    <div className="text-[9px] font-mono text-slate-400 text-right">
+                      Processo: {process.number}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Corpo da Minuta (Editável diretamente na folha) */}
+              {/* Corpo da Peça (com alinhamento dinâmico) */}
               <textarea
                 value={renderedContent}
                 onChange={(e) => setRenderedContent(e.target.value)}
-                className="w-full flex-1 border-none focus:outline-hidden resize-none bg-transparent text-justify text-slate-900 relative z-10 p-0 leading-relaxed"
+                className="w-full flex-1 border-none focus:outline-hidden resize-none bg-transparent text-slate-900 relative z-10 p-0 leading-relaxed"
                 style={{
                   fontFamily: 'inherit',
                   fontSize: 'inherit',
-                  lineHeight: 'inherit'
+                  lineHeight: 'inherit',
+                  textAlign: textAlign
                 }}
               />
 
@@ -462,7 +611,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
         {/* Rodapé do Modal */}
         <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-slate-400">
-            Ajuste margens, tipografia e dados timbrados no botão superior antes de mandar para a impressora.
+            Utilize a barra superior para alinhar o texto (justificado, centralizado ou esquerda) antes de imprimir.
           </span>
           <div className="flex items-center gap-2">
             <button

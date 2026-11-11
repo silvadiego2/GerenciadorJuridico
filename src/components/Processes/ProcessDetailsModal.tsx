@@ -4,12 +4,13 @@ import {
   X, Scale, User, Building2, Calendar, FileText, 
   CheckSquare, DollarSign, Bell, Clock, Upload, 
   Download, Eye, Plus, CheckCircle2, Copy, Check,
-  AlertCircle, ChevronRight
+  AlertCircle, ChevronRight, Sparkles
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GenerateDocumentModal } from '../Documents/GenerateDocumentModal';
 
 interface ProcessDetailsModalProps {
   process: any;
@@ -24,6 +25,7 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'geral' | 'publicacoes' | 'tarefas' | 'documentos' | 'financeiro'>('geral');
   const [cnjCopiado, setCnjCopiado] = useState(false);
+  const [modalGerarDocAberto, setModalGerarDocAberto] = useState(false);
   const queryClient = useQueryClient();
 
   // 1. Busca Publicações/Intimações vinculadas a este processo
@@ -360,14 +362,24 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
             </div>
           )}
 
-          {/* ABA 4: PASTA DIGITAL (DOCUMENTOS) */}
+          {/* ABA 4: PASTA DIGITAL (DOCUMENTOS) COM GERADOR INTELIGENTE */}
           {activeTab === 'documentos' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                 <div>
-                  <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">Peças e Documentos Anexados</h4>
-                  <p className="text-[11px] text-slate-500">Petições, procurações e comprovantes de custas deste processo</p>
+                  <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">Peças e Pasta Digital</h4>
+                  <p className="text-[11px] text-slate-500">Petições, procurações, comprovantes e minutas do processo</p>
                 </div>
+
+                {/* Botão de Criação a partir de Modelo */}
+                <button
+                  type="button"
+                  onClick={() => setModalGerarDocAberto(true)}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Gerar Peça por Modelo</span>
+                </button>
               </div>
 
               {loadingDocs ? (
@@ -376,7 +388,9 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
                 <div className="py-12 text-center bg-white border border-slate-200 rounded-lg p-6">
                   <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                   <p className="font-semibold text-slate-700">Nenhum documento anexado aos autos</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Vincule petições e arquivos a este processo pela aba Documentos.</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Utilize o botão acima para gerar procurações e declarações preenchidas automaticamente.
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-lg overflow-hidden">
@@ -459,6 +473,14 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
         </div>
 
       </div>
+
+      {/* Modal Inteligente de Geração de Peças */}
+      {modalGerarDocAberto && (
+        <GenerateDocumentModal
+          process={process}
+          onClose={() => setModalGerarDocAberto(false)}
+        />
+      )}
     </div>
   );
 };

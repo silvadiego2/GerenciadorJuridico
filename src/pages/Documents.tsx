@@ -1,7 +1,8 @@
+// src/pages/Documents.tsx
 import React, { useState } from 'react';
 import { 
-  Upload, Search, Filter, Eye, Download, Share2, Image, File, Folder, Plus, MoreVertical, Calendar, User,
-  Tag, Clock, ChevronRight, Loader2, X
+  Upload, Search, File, Folder, Download, Share2, 
+  Trash2, Eye, ChevronRight, Loader2, Scale, User
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsService } from '../lib/api';
@@ -11,396 +12,192 @@ import DocumentModal from '../components/Documents/DocumentModal';
 import { useNotifications } from '../hooks/useNotifications';
 import { useDebounce } from '../hooks/useDebounce';
 
-interface Document {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  url: string;
-  process_id?: string;
-  client_id?: string;
-  folder_id?: string;
-  uploaded_by: string;
-  version: number;
-  tags: string[];
-  is_shared: boolean;
-  description?: string;
-  created_at: string;
-  updated_at: string;
-  // Relacionamentos vindos do backend
-  process?: {
-    id: string;
-    number: string;
-    subject: string;
-  };
-  client?: {
-    id: string;
-    name: string;
-  };
-  uploaded_by_user?: {
-    id: string;
-    name: string;
-  };
-}
-
-interface Folder {
-  id: string;
-  name: string;
-  parent_id?: string;
-  process_id?: string;
-  client_id?: string;
-  created_at: string;
-  documents_count: number;
-}
-
 const Documents: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState<'all' | 'pdf' | 'image' | 'word'>('all');
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
 
-  // Query para buscar documentos
   const { data: documentsData, isLoading, error: queryError } = useQuery({
-    queryKey: ['documents', debouncedSearchTerm, selectedType, selectedFolder],
+    queryKey: ['documents', debouncedSearchTerm, selectedFolder],
     queryFn: () => {
       const params: Record<string, string> = {};
-      
       if (debouncedSearchTerm) params.search = debouncedSearchTerm;
       if (selectedFolder) params.folder_id = selectedFolder;
-      
-      // Mapear tipo para filtro do backend
-      if (selectedType !== 'all') {
-        switch (selectedType) {
-          case 'pdf':
-            params.type = 'application/pdf';
-            break;
-          case 'image':
-            params.type = 'image';
-            break;
-          case 'word':
-            params.type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-            break;
-        }
-      }
-      
       return documentsService.getAll(params);
     },
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 5 * 60 * 1000,
   });
 
   const documents = documentsData?.documents || [];
 
-  // Query para buscar pastas (mockadas por enquanto)
-  const folders: Folder[] = [
-    {
-      id: 'folder1',
-      name: 'Documentos Societários',
-      client_id: '660e8400-e29b-41d4-a716-446655440002',
-      created_at: '2024-11-01T00:00:00Z',
-      documents_count: 5
-    },
-    {
-      id: 'folder2',
-      name: 'Petições e Manifestações',
-      process_id: '770e8400-e29b-41d4-a716-446655440001',
-      created_at: '2024-12-01T00:00:00Z',
-      documents_count: 3
-    }
+  const folders = [
+    { id: 'folder1', name: 'Contratos e Procurações', count: 4 },
+    { id: 'folder2', name: 'Petições Iniciais', count: 6 },
+    { id: 'folder3', name: 'Documentos Probatórios', count: 9 },
   ];
 
-  // Mutation para criar documento
   const createDocumentMutation = useMutation({
     mutationFn: documentsService.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
-      success('Sucesso', 'Documento enviado com sucesso!');
+      success('Sucesso', 'Documento anexado com sucesso');
       setIsModalOpen(false);
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao enviar documento');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao anexar documento')
   });
 
-  const handleCreateDocument = () => {
-    setEditingDocument(null);
-    setIsModalOpen(true);
-  };
-
-  const handleSaveDocument = (documentData: Partial<Document>) => {
-    createDocumentMutation.mutate(documentData);
-  };
-
-  const getFileIcon = (type: string) => {
-    if (type === 'application/pdf') return File;
-    if (type.startsWith('image/')) return Image;
-    return File;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '0 KB';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const getTypeDisplayName = (type: string) => {
-    switch (type) {
-      case 'application/pdf': return 'PDF';
-      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': return 'Word';
-      case 'application/msword': return 'Word';
-      default:
-        if (type.startsWith('image/')) return 'Imagem';
-        return 'Arquivo';
-    }
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   if (queryError) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Erro ao carregar documentos: {(queryError as Error).message}</p>
+      <div className="p-4 sm:p-6">
+        <div className="bg-rose-50 border border-rose-200 rounded-md p-4 text-xs text-rose-800">
+          Erro ao carregar documentos: {(queryError as Error).message}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4">
+      {/* Topo */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Documentos</h1>
-          <p className="text-gray-600">Gerencie documentos por processo ou cliente</p>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Repositório de Documentos</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Gestão centralizada de petições, procurações e peças processuais</p>
         </div>
-        <div className="flex space-x-3">
-          <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2">
-            <Folder className="h-4 w-4" />
-            <span>Nova Pasta</span>
-          </button>
+
+        <div className="flex items-center gap-2">
           <button 
-            onClick={handleCreateDocument}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-2xs"
           >
-            <Upload className="h-4 w-4" />
-            <span>Upload</span>
+            <Upload className="h-3.5 w-3.5" />
+            <span>Upload de Peça</span>
           </button>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Buscar documentos, tags..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todos os tipos</option>
-            <option value="pdf">PDF</option>
-            <option value="image">Imagens</option>
-            <option value="word">Word</option>
-          </select>
-          <select
-            value={selectedFolder || ''}
-            onChange={(e) => setSelectedFolder(e.target.value || null)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Todas as pastas</option>
-            {folders.map(folder => (
-              <option key={folder.id} value={folder.id}>{folder.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Pastas */}
+      {/* Pastas Rápidas */}
       {!selectedFolder && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Pastas</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {folders.map(folder => (
-              <button
-                key={folder.id}
-                onClick={() => setSelectedFolder(folder.id)}
-                className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-              >
-                <div className="flex items-center space-x-3">
-                  <Folder className="h-8 w-8 text-blue-600" />
-                  <div>
-                    <h4 className="font-medium text-gray-900">{folder.name}</h4>
-                    <p className="text-sm text-gray-600">{folder.documents_count} documentos</p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {folders.map(f => (
+            <button
+              key={f.id}
+              onClick={() => setSelectedFolder(f.id)}
+              className="p-3 bg-white border border-slate-200 rounded-lg hover:border-slate-300 text-left transition-colors shadow-2xs flex items-center gap-3"
+            >
+              <div className="p-2 rounded bg-slate-50 text-slate-700 border border-slate-200">
+                <Folder className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-800">{f.name}</p>
+                <span className="text-[10px] text-slate-400 font-mono">{f.count} itens arquivados</span>
+              </div>
+            </button>
+          ))}
         </div>
       )}
 
-      {/* Breadcrumb */}
       {selectedFolder && (
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <button 
-            onClick={() => setSelectedFolder(null)}
-            className="hover:text-blue-600"
-          >
-            Documentos
+        <div className="flex items-center gap-1 text-xs text-slate-500 bg-white p-2.5 rounded-lg border border-slate-200">
+          <button onClick={() => setSelectedFolder(null)} className="text-indigo-600 hover:underline">
+            Todas as pastas
           </button>
-          <ChevronRight className="h-4 w-4" />
-          <span className="font-medium">
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span className="font-semibold text-slate-800">
             {folders.find(f => f.id === selectedFolder)?.name}
           </span>
         </div>
       )}
 
-      {/* Lista de Documentos */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {isLoading ? 'Carregando...' : `${documents.length} documento${documents.length !== 1 ? 's' : ''} encontrado${documents.length !== 1 ? 's' : ''}`}
-            </h2>
-            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
-          </div>
+      {/* Busca */}
+      <div className="bg-white p-3 rounded-lg border border-slate-200">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Filtrar por nome do arquivo ou processo vinculado..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+          />
+        </div>
+      </div>
+
+      {/* Lista */}
+      <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            {isLoading ? 'Carregando arquivos...' : `${documents.length} documento${documents.length !== 1 ? 's' : ''}`}
+          </h2>
+          {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-600" />}
         </div>
 
         {isLoading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-500">Carregando documentos...</p>
+          <div className="p-12 text-center text-slate-400 text-xs">
+            <Loader2 className="h-5 w-5 animate-spin text-slate-600 mx-auto mb-2" />
+            Carregando repositório...
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="p-12 text-center text-slate-400">
+            <File className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-xs font-medium text-slate-700">Nenhum documento anexado</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {documents.map((document) => {
-              const FileIcon = getFileIcon(document.type);
-              return (
-                <div key={document.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 flex-1">
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FileIcon className="h-6 w-6 text-blue-600" />
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
-                          {document.name}
-                        </h3>
-                        {document.description && (
-                          <p className="text-sm text-gray-600 mt-1">{document.description}</p>
-                        )}
-                        
-                        <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
-                          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                            {getTypeDisplayName(document.type)}
-                          </span>
-                          <span>{formatFileSize(document.size || 0)}</span>
-                          <span>v{document.version}</span>
-                          <div className="flex items-center space-x-1">
-                            <User className="h-4 w-4" />
-                            <span>{document.uploaded_by_user?.name || 'Usuário desconhecido'}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>{format(new Date(document.created_at), "dd/MM/yyyy", { locale: ptBR })}</span>
-                          </div>
-                          {document.is_shared && (
-                            <div className="flex items-center space-x-1 text-green-600">
-                              <Share2 className="h-4 w-4" />
-                              <span>Compartilhado</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Relacionamentos */}
-                        <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
-                          {document.process && (
-                            <div className="flex items-center space-x-1">
-                              <span className="font-medium">Processo:</span>
-                              <span className="font-mono text-xs">{document.process.number}</span>
-                            </div>
-                          )}
-                          {document.client && (
-                            <div className="flex items-center space-x-1">
-                              <span className="font-medium">Cliente:</span>
-                              <span>{document.client.name}</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {document.tags && document.tags.length > 0 && (
-                          <div className="flex items-center space-x-2 mt-2">
-                            <Tag className="h-4 w-4 text-gray-400" />
-                            <div className="flex space-x-1">
-                              {document.tags.map((tag, index) => (
-                                <span key={index} className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded-full">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 ml-4">
-                      <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
-                        <Download className="h-4 w-4" />
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
-                        <Share2 className="h-4 w-4" />
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
+          <div className="divide-y divide-slate-100">
+            {documents.map((doc: any) => (
+              <div key={doc.id} className="p-3.5 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded bg-slate-100 text-slate-600 shrink-0">
+                    <File className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 truncate">{doc.name}</p>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                      <span>{formatFileSize(doc.size)}</span>
+                      <span>•</span>
+                      <span>{doc.created_at ? format(new Date(doc.created_at), "dd/MM/yyyy", { locale: ptBR }) : '-'}</span>
+                      {doc.process?.number && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono text-slate-600">{doc.process.number}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-              );
-            })}
-            
-            {documents.length === 0 && !isLoading && (
-              <div className="p-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <File className="h-8 w-8 text-gray-400" />
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button className="p-1 text-slate-400 hover:text-slate-800 rounded" title="Visualizar">
+                    <Eye className="h-3.5 w-3.5" />
+                  </button>
+                  <button className="p-1 text-slate-400 hover:text-slate-800 rounded" title="Baixar">
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <p className="text-gray-500">Nenhum documento encontrado</p>
-                <p className="text-gray-400 text-sm mt-2">
-                  Faça upload de documentos para começar a organizar seus arquivos
-                </p>
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
 
-      {/* Modal de Upload */}
       {isModalOpen && (
         <DocumentModal
-          document={editingDocument}
-          onSave={handleSaveDocument}
-          onClose={() => {
-            setIsModalOpen(false);
-            setEditingDocument(null);
-          }}
+          document={null}
+          onSave={(data) => createDocumentMutation.mutate(data)}
+          onClose={() => setIsModalOpen(false)}
           isLoading={createDocumentMutation.isPending}
         />
       )}

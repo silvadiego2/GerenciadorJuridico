@@ -1,5 +1,6 @@
+// src/pages/Clients.tsx
 import React, { useState } from 'react';
-import { Plus, Search, Eye, Edit, Phone, Mail, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Eye, Edit2, Phone, Mail, Trash2, Loader2, Building, User } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '../lib/api';
 import { Client } from '../types';
@@ -7,6 +8,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import ClientModal from '../components/Clients/ClientModal';
 import { useNotifications } from '../hooks/useNotifications';
+import { useDebounce } from '../hooks/useDebounce';
 
 const Clients: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,12 +19,12 @@ const Clients: React.FC = () => {
   
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
 
-  // Query para buscar clientes
   const { data: clientsData, isLoading, error: queryError } = useQuery({
-    queryKey: ['clients', searchTerm, selectedType, selectedStatus],
+    queryKey: ['clients', debouncedSearchTerm, selectedType, selectedStatus],
     queryFn: () => clientsService.getAll({
-      search: searchTerm || undefined,
+      search: debouncedSearchTerm || undefined,
       type: selectedType !== 'all' ? selectedType : undefined,
       status: selectedStatus !== 'all' ? selectedStatus : undefined,
     }),
@@ -31,50 +33,36 @@ const Clients: React.FC = () => {
 
   const clients = Array.isArray(clientsData?.clients) ? clientsData.clients : [];
 
-  // Mutation para criar cliente
   const createClientMutation = useMutation({
     mutationFn: clientsService.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      success('Sucesso', 'Cliente criado com sucesso!');
+      success('Sucesso', 'Cliente cadastrado com sucesso');
       setIsModalOpen(false);
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao criar cliente');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao cadastrar cliente')
   });
 
-  // Mutation para atualizar cliente
   const updateClientMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Client> }) =>
       clientsService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      success('Sucesso', 'Cliente atualizado com sucesso!');
+      success('Sucesso', 'Cliente atualizado');
       setIsModalOpen(false);
       setEditingClient(null);
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao atualizar cliente');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao atualizar cliente')
   });
 
-  // Mutation para deletar cliente
   const deleteClientMutation = useMutation({
     mutationFn: clientsService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      success('Sucesso', 'Cliente excluído com sucesso!');
+      success('Sucesso', 'Cliente excluído');
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao excluir cliente');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao excluir cliente')
   });
-
-  const handleCreateClient = () => {
-    setEditingClient(null);
-    setIsModalOpen(true);
-  };
 
   const handleEditClient = (client: Client) => {
     setEditingClient(client);
@@ -82,8 +70,7 @@ const Clients: React.FC = () => {
   };
 
   const handleDeleteClient = (clientId: string, clientName?: string) => {
-    const nomeExibicao = clientName || 'este cliente';
-    if (window.confirm(`Tem certeza que deseja excluir o cliente "${nomeExibicao}"?`)) {
+    if (window.confirm(`Excluir permanentemente o cadastro de "${clientName || 'este cliente'}"?`)) {
       deleteClientMutation.mutate(clientId);
     }
   };
@@ -96,202 +83,185 @@ const Clients: React.FC = () => {
     }
   };
 
-  const formatClientDate = (dateValue?: string | Date) => {
-    if (!dateValue) return 'Não informada';
-    try {
-      const parsedDate = new Date(dateValue);
-      if (isNaN(parsedDate.getTime())) return 'Não informada';
-      return format(parsedDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
-    } catch {
-      return 'Não informada';
-    }
-  };
-
   if (queryError) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Erro ao carregar clientes: {(queryError as Error).message}</p>
+      <div className="p-4 sm:p-6">
+        <div className="bg-rose-50 border border-rose-200 rounded-md p-4 text-xs text-rose-800">
+          Erro ao carregar clientes: {(queryError as Error).message}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-4">
+      {/* Topo */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-          <p className="text-gray-600">Gerencie seus clientes e informações de contato</p>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Cadastro de Clientes</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Gestão de partes, interessados e contatos do escritório</p>
         </div>
-        <button 
-          onClick={handleCreateClient}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Novo Cliente</span>
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button 
+            type="button"
+            onClick={() => { setEditingClient(null); setIsModalOpen(true); }}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-2xs"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Novo Cliente</span>
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Buscar por nome, email ou documento..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as 'all' | 'fisica' | 'juridica')}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todos os tipos</option>
-            <option value="fisica">Pessoa Física</option>
-            <option value="juridica">Pessoa Jurídica</option>
-          </select>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value as 'all' | 'ativo' | 'inativo')}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todos os status</option>
-            <option value="ativo">Ativo</option>
-            <option value="inativo">Inativo</option>
-          </select>
+      <div className="bg-white p-3 rounded-lg border border-slate-200 flex flex-col sm:flex-row gap-2.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nome, e-mail ou CPF/CNPJ..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+          />
         </div>
+
+        <select
+          value={selectedType}
+          onChange={(e) => setSelectedType(e.target.value as any)}
+          className="px-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
+        >
+          <option value="all">Todas as naturezas</option>
+          <option value="fisica">Pessoa Física</option>
+          <option value="juridica">Pessoa Jurídica</option>
+        </select>
       </div>
 
-      {/* Lista de Clientes */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {isLoading ? 'Carregando...' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''} encontrado${clients.length !== 1 ? 's' : ''}`}
-            </h2>
-            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
-          </div>
+      {/* Lista / Tabela */}
+      <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            {isLoading ? 'Carregando clientes...' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''} cadastrado${clients.length !== 1 ? 's' : ''}`}
+          </h2>
+          {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-600" />}
         </div>
-        
+
         {isLoading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-500">Carregando clientes...</p>
+          <div className="p-12 text-center text-slate-400 text-xs">
+            <Loader2 className="h-5 w-5 animate-spin text-slate-600 mx-auto mb-2" />
+            Carregando cadastro...
+          </div>
+        ) : clients.length === 0 ? (
+          <div className="p-12 text-center text-slate-400">
+            <User className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-xs font-medium text-slate-700">Nenhum cliente cadastrado</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Ao sincronizar processos via Projudi, os promoventes são cadastrados automaticamente aqui.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {clients.map((client) => {
-              const displayName = client?.name || 'Cliente Sem Nome';
-              const initialLetter = displayName.trim().charAt(0).toUpperCase() || 'C';
-              const rawStatus = (client?.status as string) || 'ativo';
-              const statusDisplay = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
-
-              return (
-                <div key={client.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-semibold text-lg">
-                          {initialLetter}
+          <>
+            {/* Visão Desktop */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full text-left text-xs divide-y divide-slate-200">
+                <thead className="bg-slate-50/75 text-slate-500 font-semibold text-[11px] tracking-wider uppercase">
+                  <tr>
+                    <th className="py-2.5 px-3">Cliente / Interessado</th>
+                    <th className="py-2.5 px-3">Documento (CPF/CNPJ)</th>
+                    <th className="py-2.5 px-3">Contatos</th>
+                    <th className="py-2.5 px-3">Cidade / UF</th>
+                    <th className="py-2.5 px-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {clients.map((client: any) => (
+                    <tr key={client.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-2.5 px-3">
+                        <p className="font-semibold text-slate-900">{client.name}</p>
+                        <span className="text-[10px] text-slate-400 uppercase font-mono">
+                          {client.type === 'juridica' ? 'Pessoa Jurídica' : 'Pessoa Física'}
                         </span>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{displayName}</h3>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            client?.type === 'fisica' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {client?.type === 'fisica' ? 'Pessoa Física' : 'Pessoa Jurídica'}
-                          </span>
-                          {client?.document && <span className="text-sm text-gray-600">{client.document}</span>}
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            rawStatus === 'ativo' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {statusDisplay}
-                          </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-600">
+                        {client.document || '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600">
+                        {client.email && <p className="truncate max-w-[200px]">{client.email}</p>}
+                        {client.phone && <p className="text-[11px] text-slate-400">{client.phone}</p>}
+                        {!client.email && !client.phone && '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600">
+                        {client.address?.city ? `${client.address.city}/${client.address.state || 'BA'}` : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleEditClient(client)}
+                            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                            title="Editar"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClient(client.id, client.name)}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
-                      </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Visão Mobile */}
+            <div className="divide-y divide-slate-100 lg:hidden">
+              {clients.map((client: any) => (
+                <div key={client.id} className="p-3.5 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold text-xs text-slate-900">{client.name}</p>
+                      <span className="text-[10px] font-mono uppercase text-slate-400">
+                        {client.type === 'juridica' ? 'Pessoa Jurídica' : 'Pessoa Física'}
+                      </span>
                     </div>
-                    
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right text-sm text-gray-600 hidden sm:block">
-                        {client?.email && (
-                          <div className="flex items-center space-x-1">
-                            <Mail className="h-4 w-4" />
-                            <span>{client.email}</span>
-                          </div>
-                        )}
-                        {client?.phone && (
-                          <div className="flex items-center space-x-1 mt-1">
-                            <Phone className="h-4 w-4" />
-                            <span>{client.phone}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleEditClient(client)}
-                          className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteClient(client.id, client.name)}
-                          disabled={deleteClientMutation.isPending}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          {deleteClientMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 text-sm text-gray-600">
-                    {client?.address && (
-                      <p>
-                        <strong>Endereço:</strong> {client.address.street || ''}{client.address.number ? `, ${client.address.number}` : ''}
-                        {client.address.complement && `, ${client.address.complement}`}
-                        {(client.address.neighborhood || client.address.city) && ` - ${client.address.neighborhood || ''}, ${client.address.city || ''}/${client.address.state || ''}`}
-                      </p>
+                    {client.document && (
+                      <span className="text-[11px] font-mono text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                        {client.document}
+                      </span>
                     )}
-                    <p className="mt-1">
-                      <strong>Cadastrado em:</strong> {formatClientDate(client?.createdAt)}
-                    </p>
+                  </div>
+
+                  {(client.email || client.phone) && (
+                    <div className="text-[11px] text-slate-500 space-y-0.5 bg-slate-50 p-2 rounded">
+                      {client.email && <p className="truncate">Email: {client.email}</p>}
+                      {client.phone && <p>Tel: {client.phone}</p>}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-1 pt-1">
+                    <button
+                      onClick={() => handleEditClient(client)}
+                      className="px-2.5 py-1 text-xs border border-slate-200 rounded text-slate-600 hover:bg-slate-50 flex items-center gap-1"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" /> Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClient(client.id, client.name)}
+                      className="px-2.5 py-1 text-xs border border-rose-200 text-rose-600 hover:bg-rose-50 rounded flex items-center gap-1"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Excluir
+                    </button>
                   </div>
                 </div>
-              );
-            })}
-          
-            {clients.length === 0 && (
-              <div className="p-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="h-8 w-8 text-gray-400" />
-                </div>
-                <p className="text-gray-500">Nenhum cliente encontrado com os filtros aplicados</p>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Modal de Cliente */}
       {isModalOpen && (
         <ClientModal
           client={editingClient}

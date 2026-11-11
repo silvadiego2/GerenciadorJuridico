@@ -1,6 +1,20 @@
+// src/components/Dashboard/ProcessChart.tsx
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { FileText, CheckSquare } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  LineChart, 
+  Line 
+} from 'recharts';
+import { FileText, CheckSquare, TrendingUp } from 'lucide-react';
 import { Dashboard } from '../../types';
 
 interface ProcessChartProps {
@@ -8,27 +22,24 @@ interface ProcessChartProps {
 }
 
 const ProcessChart: React.FC<ProcessChartProps> = ({ data }) => {
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
-  const PRIORITY_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#6B7280'];
+  // Paleta institucional corporativa
+  const PIE_COLORS = ['#334155', '#475569', '#64748b', '#94a3b8'];
 
-  // Dados para gráfico de processos por status
-  const processStatusData = data.processesByStatus.length > 0 ? data.processesByStatus : [
-    { status: 'Ativo', count: 0 },
+  const processStatusData = data.processesByStatus?.length > 0 ? data.processesByStatus : [
+    { status: 'Ativo', count: data.activeProcesses || 0 },
     { status: 'Suspenso', count: 0 },
     { status: 'Arquivado', count: 0 },
     { status: 'Baixado', count: 0 }
   ];
 
-  // Dados para gráfico de tarefas por prioridade
-  const taskPriorityData = data.tasksByPriority.length > 0 ? data.tasksByPriority : [
+  const taskPriorityData = data.tasksByPriority?.length > 0 ? data.tasksByPriority : [
     { priority: 'Urgente', count: 0 },
     { priority: 'Alta', count: 0 },
     { priority: 'Média', count: 0 },
     { priority: 'Baixa', count: 0 }
   ];
 
-  // Dados para gráfico de receita por mês
-  const revenueData = data.revenueByMonth.length > 0 ? data.revenueByMonth : [
+  const revenueData = data.revenueByMonth?.length > 0 ? data.revenueByMonth : [
     { month: 'Jul', value: 0 },
     { month: 'Ago', value: 0 },
     { month: 'Set', value: 0 },
@@ -38,131 +49,148 @@ const ProcessChart: React.FC<ProcessChartProps> = ({ data }) => {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Gráfico de Receita por Mês */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Evolução da Receita</h3>
-          <span className="text-sm text-gray-500">Últimos 6 meses</span>
+    <div className="space-y-3.5">
+      {/* 1. Evolução da Receita */}
+      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-slate-500" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Fluxo de Faturamento</h3>
+          </div>
+          <span className="text-[11px] font-mono text-slate-400">Últimos 6 meses</span>
         </div>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={revenueData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis 
-              dataKey="month" 
-              tick={{ fontSize: 12 }}
-              axisLine={{ stroke: '#e5e7eb' }}
-            />
-            <YAxis 
-              tick={{ fontSize: 12 }}
-              axisLine={{ stroke: '#e5e7eb' }}
-              tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-            />
-            <Tooltip 
-              formatter={(value) => [`R$ ${Number(value).toLocaleString()}`, 'Receita']}
-              labelStyle={{ color: '#374151' }}
-              contentStyle={{ 
-                backgroundColor: '#fff', 
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="value" 
-              stroke="#3B82F6" 
-              strokeWidth={3}
-              dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+
+        <div className="h-60 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis 
+                dataKey="month" 
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={{ stroke: '#e2e8f0' }}
+                tickLine={false}
+              />
+              <YAxis 
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+              />
+              <Tooltip 
+                formatter={(value) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Receita']}
+                labelStyle={{ color: '#0f172a', fontWeight: 600, fontSize: 12 }}
+                contentStyle={{ 
+                  backgroundColor: '#ffffff', 
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                  fontSize: 12
+                }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="value" 
+                stroke="#0f172a" 
+                strokeWidth={2}
+                dot={{ fill: '#0f172a', strokeWidth: 1, r: 3 }}
+                activeDot={{ r: 5, stroke: '#0f172a', strokeWidth: 1 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
-      {/* Gráficos de Processos e Tarefas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Processos por Status */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Processos por Status</h3>
+      {/* 2. Gráficos Comparativos Lado a Lado */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {/* Distribuição de Processos */}
+        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 mb-3 pb-2 border-b border-slate-100">
+            Processos por Status
+          </h3>
           {processStatusData.every(item => item.count === 0) ? (
-            <div className="h-64 flex items-center justify-center text-gray-500">
+            <div className="h-48 flex items-center justify-center text-slate-400">
               <div className="text-center">
-                <FileText className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                <p>Nenhum processo cadastrado</p>
+                <FileText className="h-8 w-8 mx-auto mb-1.5 text-slate-300" />
+                <p className="text-xs">Nenhum processo com status atribuído</p>
               </div>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={processStatusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="count"
-                >
-                  {processStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value, name) => [value, name]}
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={processStatusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={70}
+                    paddingAngle={3}
+                    dataKey="count"
+                    label={({ name, percent }) => percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                  >
+                    {processStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#ffffff', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      fontSize: 12
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </div>
 
         {/* Tarefas por Prioridade */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tarefas por Prioridade</h3>
+        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 mb-3 pb-2 border-b border-slate-100">
+            Fila de Prazos por Urgência
+          </h3>
           {taskPriorityData.every(item => item.count === 0) ? (
-            <div className="h-64 flex items-center justify-center text-gray-500">
+            <div className="h-48 flex items-center justify-center text-slate-400">
               <div className="text-center">
-                <CheckSquare className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                <p>Nenhuma tarefa cadastrada</p>
+                <CheckSquare className="h-8 w-8 mx-auto mb-1.5 text-slate-300" />
+                <p className="text-xs">Nenhuma tarefa pendente</p>
               </div>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={taskPriorityData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="priority" 
-                  tick={{ fontSize: 12 }}
-                  axisLine={{ stroke: '#e5e7eb' }}
-                />
-                <YAxis 
-                  tick={{ fontSize: 12 }}
-                  axisLine={{ stroke: '#e5e7eb' }}
-                />
-                <Tooltip 
-                  formatter={(value, name) => [value, 'Tarefas']}
-                  labelFormatter={(label) => `Prioridade: ${label}`}
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-                <Bar 
-                  dataKey="count" 
-                  fill="#3B82F6"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={taskPriorityData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis 
+                    dataKey="priority" 
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip 
+                    formatter={(value) => [value, 'Tarefas']}
+                    contentStyle={{ 
+                      backgroundColor: '#ffffff', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      fontSize: 12
+                    }}
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    fill="#334155"
+                    radius={[3, 3, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </div>
       </div>

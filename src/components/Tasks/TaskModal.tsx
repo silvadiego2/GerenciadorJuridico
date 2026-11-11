@@ -1,3 +1,4 @@
+// src/components/Tasks/TaskModal.tsx
 import React, { useState, useEffect } from 'react';
 import { X, CheckSquare, User, Calendar, AlertTriangle, FileText, Clock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -26,7 +27,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onSave, onClose, isLoading 
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Buscar dados para os dropdowns
   const { data: clientsData, isLoading: loadingClients } = useQuery({
     queryKey: ['clients'],
     queryFn: () => clientsService.getAll(),
@@ -56,7 +56,18 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onSave, onClose, isLoading 
         assignedTo: task.assignedTo,
         priority: task.priority,
         status: task.status,
-        dueDate: format(task.dueDate, 'yyyy-MM-dd\'T\'HH:mm'),
+        dueDate: task.dueDate ? format(new Date(task.dueDate), "yyyy-MM-dd'T'HH:mm") : '',
+      });
+    } else {
+      setFormData({
+        title: '',
+        description: '',
+        processId: '',
+        clientId: '',
+        assignedTo: '',
+        priority: 'media',
+        status: 'pendente',
+        dueDate: '',
       });
     }
   }, [task]);
@@ -87,6 +98,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onSave, onClose, isLoading 
       const taskData = {
         ...formData,
         due_date: new Date(formData.dueDate).toISOString(),
+        dueDate: new Date(formData.dueDate).toISOString(),
         process_id: formData.processId || null,
         client_id: formData.clientId || null,
         assigned_to: formData.assignedTo,
@@ -103,183 +115,174 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onSave, onClose, isLoading 
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgente': return 'text-red-600';
-      case 'alta': return 'text-orange-600';
-      case 'media': return 'text-yellow-600';
-      case 'baixa': return 'text-green-600';
-      default: return 'text-gray-600';
-    }
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {task ? 'Editar Tarefa' : 'Nova Tarefa'}
-          </h2>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden text-xs">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded bg-slate-900 text-white flex items-center justify-center shrink-0">
+              <CheckSquare className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                {task ? 'Editar Prazo / Tarefa' : 'Novo Prazo Processual'}
+              </h2>
+              <p className="text-[11px] text-slate-400">Atribua prazos fatais, audiências ou diligências forenses</p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Informações Básicas */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Informações da Tarefa</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Título *
-                </label>
-                <div className="relative">
-                  <CheckSquare className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => handleChange('title', e.target.value)}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.title ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Ex: Apresentar contestação, Agendar audiência..."
-                  />
-                </div>
-                {errors.title && <p className="text-red-600 text-sm mt-1">{errors.title}</p>}
+        {/* Formulário com rolagem */}
+        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 flex-1">
+          {/* Identificação */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-slate-700 font-medium mb-1">
+                Título do Prazo / Tarefa *
+              </label>
+              <div className="relative">
+                <CheckSquare className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => handleChange('title', e.target.value)}
+                  className={`pl-9 pr-3 py-1.5 w-full border rounded-md text-xs focus:outline-hidden focus:border-slate-400 ${
+                    errors.title ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 focus:bg-white'
+                  }`}
+                  placeholder="Ex: Apresentar Réplica, Audiência de Instrução, Agravo de Instrumento..."
+                />
               </div>
+              {errors.title && <p className="text-rose-600 text-[11px] mt-0.5">{errors.title}</p>}
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição
-                </label>
-                <div className="relative">
-                  <FileText className="absolute left-3 top-3 text-gray-400 h-4 w-4" />
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => handleChange('description', e.target.value)}
-                    rows={3}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    placeholder="Descreva os detalhes da tarefa..."
-                  />
-                </div>
+            <div>
+              <label className="block text-slate-700 font-medium mb-1">
+                Orientações / Descrição
+              </label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-2.5 text-slate-400 h-3.5 w-3.5" />
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => handleChange('description', e.target.value)}
+                  rows={2}
+                  className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400 resize-none"
+                  placeholder="Instruções ou apontamentos sobre o cumprimento do prazo..."
+                />
               </div>
             </div>
           </div>
 
-          {/* Relacionamentos */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Relacionamentos</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Vinculação Processual */}
+          <div className="space-y-3 pt-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pb-1 border-b border-slate-100">
+              Vínculo & Responsabilidade
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Processo (Opcional)
+                <label className="block text-slate-700 font-medium mb-1">
+                  Autos Vinculados (Opcional)
                 </label>
                 <select
                   value={formData.processId}
                   onChange={(e) => handleChange('processId', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400 font-mono"
                   disabled={loadingProcesses}
                 >
-                  <option value="">Selecione um processo</option>
-                  {processes.map((process: Process) => (
-                    <option key={process.id} value={process.id}>
-                      {process.number} - {process.subject}
+                  <option value="">Nenhum processo vinculado</option>
+                  {processes.map((p: Process) => (
+                    <option key={p.id} value={p.id}>
+                      {p.number} - {p.subject?.slice(0, 30)}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-slate-700 font-medium mb-1">
                   Cliente (Opcional)
                 </label>
                 <select
                   value={formData.clientId}
                   onChange={(e) => handleChange('clientId', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
                   disabled={loadingClients}
                 >
-                  <option value="">Selecione um cliente</option>
-                  {clients.map((client: Client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
+                  <option value="">Nenhum cliente vinculado</option>
+                  {clients.map((c: Client) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Responsável *
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-medium mb-1">
+                  Responsável pelo Cumprimento *
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <select
                     value={formData.assignedTo}
                     onChange={(e) => handleChange('assignedTo', e.target.value)}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.assignedTo ? 'border-red-300' : 'border-gray-300'
+                    className={`pl-9 pr-3 py-1.5 w-full border rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400 ${
+                      errors.assignedTo ? 'border-rose-300' : 'border-slate-200'
                     }`}
                     disabled={loadingUsers}
                   >
-                    <option value="">Selecione um responsável</option>
-                    {users.filter((user: UserType) => ['admin', 'advogado', 'estagiario'].includes(user.role)).map((user: UserType) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name} ({user.role})
+                    <option value="">Selecione o advogado ou operador</option>
+                    {users.map((u: UserType) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role})
                       </option>
                     ))}
                   </select>
                 </div>
-                {errors.assignedTo && <p className="text-red-600 text-sm mt-1">{errors.assignedTo}</p>}
+                {errors.assignedTo && <p className="text-rose-600 text-[11px] mt-0.5">{errors.assignedTo}</p>}
               </div>
             </div>
           </div>
 
-          {/* Configurações */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Configurações</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Vencimento e Prioridade */}
+          <div className="space-y-3 pt-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pb-1 border-b border-slate-100">
+              Vencimento & Gravidade
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Prioridade *
+                <label className="block text-slate-700 font-medium mb-1">
+                  Prioridade Forense
                 </label>
                 <div className="relative">
-                  <AlertTriangle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <AlertTriangle className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <select
                     value={formData.priority}
-                    onChange={(e) => handleChange('priority', e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => handleChange('priority', e.target.value as any)}
+                    className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
                   >
                     <option value="baixa">Baixa</option>
                     <option value="media">Média</option>
                     <option value="alta">Alta</option>
-                    <option value="urgente">Urgente</option>
+                    <option value="urgente">Urgente (Fatal)</option>
                   </select>
-                </div>
-                <div className="mt-1 flex items-center space-x-1">
-                  <div className={`w-2 h-2 rounded-full ${
-                    formData.priority === 'urgente' ? 'bg-red-500' :
-                    formData.priority === 'alta' ? 'bg-orange-500' :
-                    formData.priority === 'media' ? 'bg-yellow-500' : 'bg-green-500'
-                  }`}></div>
-                  <span className={`text-xs ${getPriorityColor(formData.priority)}`}>
-                    {formData.priority.charAt(0).toUpperCase() + formData.priority.slice(1)}
-                  </span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status *
+                <label className="block text-slate-700 font-medium mb-1">
+                  Status
                 </label>
                 <select
                   value={formData.status}
-                  onChange={(e) => handleChange('status', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) => handleChange('status', e.target.value as any)}
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
                 >
                   <option value="pendente">Pendente</option>
                   <option value="em_andamento">Em Andamento</option>
@@ -289,57 +292,50 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onSave, onClose, isLoading 
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data de Vencimento *
+                <label className="block text-slate-700 font-medium mb-1">
+                  Data e Hora Fatal *
                 </label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="datetime-local"
                     value={formData.dueDate}
                     onChange={(e) => handleChange('dueDate', e.target.value)}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.dueDate ? 'border-red-300' : 'border-gray-300'
+                    className={`pl-9 pr-3 py-1.5 w-full border rounded-md font-mono text-xs focus:outline-hidden focus:border-slate-400 ${
+                      errors.dueDate ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 focus:bg-white'
                     }`}
                   />
                 </div>
-                {errors.dueDate && <p className="text-red-600 text-sm mt-1">{errors.dueDate}</p>}
+                {errors.dueDate && <p className="text-rose-600 text-[11px] mt-0.5">{errors.dueDate}</p>}
               </div>
             </div>
           </div>
 
-          {/* Informações Adicionais */}
+          {/* Lembrete de Prazo */}
           {formData.dueDate && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-5 w-5 text-blue-600" />
-                <span className="text-blue-800 font-medium">
-                  Prazo: {format(new Date(formData.dueDate), "dd/MM/yyyy 'às' HH:mm")}
-                </span>
-              </div>
-              <p className="text-blue-700 text-sm mt-1">
-                {new Date(formData.dueDate) < new Date() ? 
-                  'Atenção: Esta data já passou!' : 
-                  `Faltam ${Math.ceil((new Date(formData.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} dias`
-                }
-              </p>
+            <div className="bg-slate-50 border border-slate-200 rounded-md p-2.5 flex items-center gap-2 text-[11px] text-slate-600 font-mono">
+              <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span>
+                Termo fatal: {format(new Date(formData.dueDate), "dd/MM/yyyy 'às' HH:mm")}
+              </span>
             </div>
           )}
 
-          <div className="flex space-x-3 pt-4">
+          {/* Rodapé fixo */}
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-3.5 py-1.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isLoading || loadingClients || loadingProcesses || loadingUsers}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-1.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 disabled:opacity-50 transition-colors font-medium shadow-2xs"
             >
-              {isLoading ? 'Salvando...' : (task ? 'Salvar' : 'Criar')}
+              {isLoading ? 'Salvando...' : (task ? 'Salvar Alterações' : 'Agendar Prazo')}
             </button>
           </div>
         </form>

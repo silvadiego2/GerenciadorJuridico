@@ -98,13 +98,12 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
         client: clientData || process.client
       });
 
-      // Divide por linhas duplas ou simples e monta blocos com alinhamento justificado inicial
+      // Divide por linhas e monta blocos com alinhamento justificado inicial
       const paragrafosHtml = interpolated
         .split('\n')
         .map(linha => {
           const l = linha.trim();
           if (!l) return '<p style="text-align: justify;"><br></p>';
-          // Centraliza automaticamente cabeçalhos e assinaturas comuns
           if (l === l.toUpperCase() && l.length < 55 && !l.includes(':')) {
             return `<p style="text-align: center; font-weight: bold;">${linha}</p>`;
           }
@@ -140,36 +139,63 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     }
   };
 
+  // Salvar na Pasta Digital com persistência completa
   const saveDocumentMutation = useMutation({
     mutationFn: async () => {
       const tpl = templates.find((t: any) => t.id === selectedTemplateId);
-      const title = `${tpl?.title || 'Documento'} - ${process.number}`;
+      const title = `${tpl?.title || 'Documento'} - ${process?.number || 'Processo'}`;
       const rawText = editorRef.current?.innerText || '';
+      const htmlContent = editorRef.current?.innerHTML || '';
 
-      const blob = new Blob([rawText], { type: 'text/plain;charset=utf-8' });
-      
+      const targetProcessId = process?.id || process?.processId || null;
+      const targetClientId = process?.client_id || process?.clientId || clientData?.id || null;
+
       const payload = {
         name: `${title}.txt`,
+        title: title,
         type: 'text/plain',
-        size: blob.size,
-        process_id: process.id,
-        client_id: process.client_id || process.clientId || null,
-        description: `Gerado via Template Inteligente: ${tpl?.title}`,
+        content: rawText,
+        html_content: htmlContent,
+        size: new Blob([rawText]).size,
+        process_id: targetProcessId,
+        client_id: targetClientId,
+        category: tpl?.category || 'Minutas e Peças',
+        description: `Gerado via Template: ${tpl?.title || 'Personalizado'}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      const { error: insertErr } = await supabase.from('documents').insert([payload]);
-      if (insertErr) throw insertErr;
+      const { error: insertErr } = await supabase
+        .from('documents')
+        .insert([payload]);
+
+      if (insertErr) {
+        // Fallback para caso colunas extras (title, html_content, category) não existam na tabela documents
+        const fallbackPayload = {
+          name: `${title}.txt`,
+          size: new Blob([rawText]).size,
+          type: 'text/plain',
+          process_id: targetProcessId,
+          client_id: targetClientId,
+          description: rawText.substring(0, 500),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        const { error: fallbackErr } = await supabase.from('documents').insert([fallbackPayload]);
+        if (fallbackErr) throw fallbackErr;
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['process-documents', process.id] });
+      const pid = process?.id || process?.processId;
+      if (pid) {
+        queryClient.invalidateQueries({ queryKey: ['process-documents', pid] });
+      }
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       success('Salvo na Pasta Digital', 'A peça foi registrada nos documentos deste processo.');
       if (onSuccess) onSuccess();
       onClose();
     },
-    onError: (err: any) => error('Erro ao salvar', err.message)
+    onError: (err: any) => error('Erro ao salvar', err.message || 'Falha ao persistir documento no banco.')
   });
 
   const handleCopy = () => {
@@ -208,7 +234,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
               </div>
             </div>
             <div style="font-size: 8pt; font-family: monospace; color: #64748b; text-align: right;">
-              Autos nº ${process.number}
+              Autos nº ${process?.number || ''}
             </div>
           </div>
         `;
@@ -316,7 +342,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 Emissão de Minutas e Papel Timbrado
               </h2>
               <p className="text-[11px] text-slate-500 font-mono">
-                Autos: {process.number} • Parte: {clientData?.name || process.plaintiff || 'Vinculada'}
+                Autos: {process?.number || '-'} • Parte: {clientData?.name || process?.plaintiff || 'Vinculada'}
               </p>
             </div>
           </div>
@@ -690,7 +716,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                   </div>
                   {pageSettings.posicaoLogo !== 'center' && (
                     <div className="text-[9px] font-mono text-slate-400 text-right">
-                      Processo: {process.number}
+                      Processo: {process?.number || ''}
                     </div>
                   )}
                 </div>

@@ -1,73 +1,90 @@
+// src/App.tsx
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { AuthProvider } from './contexts/AuthContext';
+import NotificationContainer from './components/Layout/NotificationContainer';
+import ProtectedRoute from './components/ProtectedRoute';
+import Layout from './components/Layout/Layout';
 
-// Layout
-import Sidebar from './components/Layout/Sidebar';
-
-// Páginas
+// Páginas do Gerenciador Jurídico
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Processes from './pages/Processes';
 import Tasks from './pages/Tasks';
+import Integrations from './pages/Integrations';
 import Documents from './pages/Documents';
 import Financial from './pages/Financial';
 import Publications from './pages/Publications';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 
+// Módulo de Consulta Processual por OAB
+import { ConsultaProcessosOAB } from './components/ConsultaProcessosOAB';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
       retry: 1,
     },
   },
 });
 
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return (
-    <div className="min-h-screen bg-slate-100 flex flex-col lg:flex-row text-slate-800">
-      {/* Barra lateral fixa (desktop) e gaveta retrátil (mobile) */}
-      <Sidebar />
-
-      {/* Conteúdo Principal com espaçamentos calculados para mobile e desktop */}
-      <main className="flex-1 lg:pl-64 pt-14 lg:pt-0 min-w-0 transition-all">
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-          {children}
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export const App: React.FC = () => {
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppLayout>
+      <AuthProvider>
+        <Router>
+          <NotificationContainer />
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/clientes" element={<Clients />} />
-            <Route path="/processos" element={<Processes />} />
-            <Route path="/tarefas" element={<Tasks />} />
-            <Route path="/documentos" element={<Documents />} />
-            <Route path="/financeiro" element={<Financial />} />
-            <Route path="/publicacoes" element={<Publications />} />
-            <Route path="/relatorios" element={<Reports />} />
-            <Route path="/configuracoes" element={<Settings />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="clientes" element={<Clients />} />
+              <Route path="processos" element={<Processes />} />
+              
+              {/* Rota da Consulta por OAB */}
+              <Route path="consulta-oab" element={<ConsultaProcessosOAB />} />
+              
+              <Route path="tarefas" element={<Tasks />} />
+              <Route path="integracoes" element={<Integrations />} />
+              <Route path="documentos" element={<Documents />} />
+              <Route path="financeiro" element={<Financial />} />
+              <Route path="publicacoes" element={<Publications />} />
+              <Route path="relatorios" element={<Reports />} />
+              
+              <Route
+                path="configuracoes"
+                element={
+                  <ProtectedRoute requiredRoles={['admin']}>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Redirecionamento da rota legada de usuários para a aba unificada em configurações */}
-            <Route path="/usuarios" element={<Navigate to="/configuracoes" replace />} />
+              {/* Redirecionamento da tela duplicada de Usuários para Configurações */}
+              <Route
+                path="usuarios"
+                element={<Navigate to="/configuracoes" replace />}
+              />
+            </Route>
 
-            {/* Fallback para rotas inexistentes */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            {/* Fallback de rotas inexistentes */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </AppLayout>
-      </BrowserRouter>
+        </Router>
+      </AuthProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
-};
+}
 
 export default App;

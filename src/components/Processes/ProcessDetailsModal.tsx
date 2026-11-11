@@ -2,15 +2,15 @@
 import React, { useState } from 'react';
 import { 
   X, Scale, User, Building2, Calendar, FileText, 
-  CheckSquare, DollarSign, Bell, Clock, Upload, 
-  Download, Eye, Plus, CheckCircle2, Copy, Check,
-  AlertCircle, ChevronRight, Sparkles
+  Clock, DollarSign, Bell, Download, Eye, 
+  CheckCircle2, Copy, Check, Sparkles, Edit, Save, Loader2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GenerateDocumentModal } from '../Documents/GenerateDocumentModal';
+import { useNotifications } from '../../hooks/useNotifications';
 
 interface ProcessDetailsModalProps {
   process: any;
@@ -26,9 +26,15 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'geral' | 'publicacoes' | 'tarefas' | 'documentos' | 'financeiro'>('geral');
   const [cnjCopiado, setCnjCopiado] = useState(false);
   const [modalGerarDocAberto, setModalGerarDocAberto] = useState(false);
-  const queryClient = useQueryClient();
+  
+  // Estado para Visualizar / Editar documento já salvo na Pasta Digital
+  const [viewingDoc, setViewingDoc] = useState<any | null>(null);
+  const [editDocText, setEditDocText] = useState<string>('');
 
-  // 1. Busca Publicações/Intimações vinculadas a este processo
+  const queryClient = useQueryClient();
+  const { success, error: notifyError } = useNotifications();
+
+  // 1. Busca Publicações
   const { data: publicacoes = [], isLoading: loadingPubs } = useQuery({
     queryKey: ['process-publications', process.id, process.number],
     queryFn: async () => {
@@ -42,7 +48,7 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
     }
   });
 
-  // 2. Busca Tarefas/Prazos vinculados a este processo
+  // 2. Busca Tarefas
   const { data: tarefas = [], isLoading: loadingTarefas } = useQuery({
     queryKey: ['process-tasks', process.id],
     queryFn: async () => {
@@ -56,7 +62,7 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
     }
   });
 
-  // 3. Busca Documentos vinculados a este processo
+  // 3. Busca Documentos da Pasta Digital
   const { data: documentos = [], isLoading: loadingDocs } = useQuery({
     queryKey: ['process-documents', process.id],
     queryFn: async () => {
@@ -70,7 +76,7 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
     }
   });
 
-  // 4. Busca Lançamentos Financeiros deste processo
+  // 4. Busca Lançamentos Financeiros
   const { data: lancamentos = [], isLoading: loadingFin } = useQuery({
     queryKey: ['process-financial', process.id],
     queryFn: async () => {
@@ -84,20 +90,33 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
     }
   });
 
-  // Concluir tarefa rapidamente
-  const completeTaskMutation = useMutation({
-    mutationFn: async (taskId: string) => {
+  // Salvar edições feitas em um documento já gravado
+  const updateDocMutation = useMutation({
+    mutationFn: async () => {
+      if (!viewingDoc) return;
       const { error } = await supabase
-        .from('tasks')
-        .update({ status: 'concluida', updated_at: new Date().toISOString() })
-        .eq('id', taskId);
+        .from('documents')
+        .update({
+          content: editDocText,
+          description: editDocText.substring(0, 300),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', viewingDoc.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['process-tasks', process.id] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    }
+      queryClient.invalidateQueries({ queryKey: ['process-documents', process.id] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      success('Atualizado', 'Alterações salvas no documento.');
+      setViewingDoc(null);
+    },
+    onError: (err: any) => notifyError('Erro ao atualizar', err.message)
   });
+
+  const handleAbrirDoc = (doc: any) => {
+    setViewingDoc(doc);
+    setEditDocText(doc.content || doc.description || '');
+  };
 
   const handleCopiarCnj = () => {
     navigator.clipboard.writeText(process.number);
@@ -133,7 +152,7 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
       <div className="bg-white w-full max-w-4xl rounded-xl border border-slate-200 shadow-2xl flex flex-col h-[90vh] overflow-hidden">
         
-        {/* Topo Institucional da Ficha */}
+        {/* Topo Institucional */}
         <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-start justify-between gap-3 shrink-0">
           <div className="flex items-start gap-3 min-w-0">
             <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-white shrink-0 mt-0.5 shadow-2xs">
@@ -154,9 +173,6 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
                 </button>
                 <span className="px-2 py-0.5 text-[10px] font-semibold border rounded-sm uppercase bg-emerald-50 text-emerald-700 border-emerald-200">
                   {process.status || 'Ativo'}
-                </span>
-                <span className="px-2 py-0.5 text-[10px] font-medium border rounded-sm capitalize bg-slate-100 text-slate-700 border-slate-200">
-                  Fase: {process.phase || 'Conhecimento'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 truncate mt-0.5 font-medium">
@@ -184,7 +200,7 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
           </div>
         </div>
 
-        {/* Barra de Abas do Processo */}
+        {/* Abas */}
         <div className="px-5 border-b border-slate-200 bg-white flex gap-1 overflow-x-auto shrink-0 select-none">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -213,165 +229,42 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
           })}
         </div>
 
-        {/* Conteúdo Dinâmico por Aba */}
+        {/* Conteúdo */}
         <div className="p-5 flex-1 overflow-y-auto bg-slate-50/40 text-xs">
           
-          {/* ABA 1: DADOS GERAIS */}
+          {/* ABA GERAL */}
           {activeTab === 'geral' && (
             <div className="space-y-4 max-w-3xl">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3.5 bg-white border border-slate-200 rounded-lg shadow-2xs">
                   <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5 mb-1">
-                    <User className="w-3.5 h-3.5 text-indigo-600" /> Autor / Promovente (Cliente)
+                    <User className="w-3.5 h-3.5 text-indigo-600" /> Promovente (Cliente)
                   </span>
                   <p className="text-sm font-semibold text-slate-900">
                     {process.client?.name || process.plaintiff || 'Não informado'}
                   </p>
-                  {process.client?.document && (
-                    <p className="text-[11px] text-slate-500 font-mono mt-0.5">CPF/CNPJ: {process.client.document}</p>
-                  )}
                 </div>
-
                 <div className="p-3.5 bg-white border border-slate-200 rounded-lg shadow-2xs">
                   <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5 mb-1">
-                    <Building2 className="w-3.5 h-3.5 text-slate-500" /> Réu / Promovido (Parte Contrária)
+                    <Building2 className="w-3.5 h-3.5 text-slate-500" /> Promovido (Réu)
                   </span>
                   <p className="text-sm font-semibold text-slate-900">
                     {process.defendant || 'Não informado'}
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Polo Passivo</p>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-2xs divide-y divide-slate-100">
-                <div className="py-2 flex justify-between">
-                  <span className="text-slate-500">Classe Processual</span>
-                  <span className="font-semibold text-slate-800">{process.class || 'Procedimento Comum Cível'}</span>
-                </div>
-                <div className="py-2 flex justify-between">
-                  <span className="text-slate-500">Vara / Tribunal / Juízo</span>
-                  <span className="font-medium text-slate-800">{process.court || 'Tribunal de Justiça da Bahia (TJ-BA)'}</span>
-                </div>
-                <div className="py-2 flex justify-between">
-                  <span className="text-slate-500">Data de Distribuição</span>
-                  <span className="font-mono font-medium text-slate-800">
-                    {formatDate(process.distributionDate || process.distribution_date)}
-                  </span>
-                </div>
-                <div className="py-2 flex justify-between">
-                  <span className="text-slate-500">Valor da Causa</span>
-                  <span className="font-mono font-bold text-emerald-700">
-                    {process.value ? `R$ ${Number(process.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Não atribuído'}
-                  </span>
-                </div>
-                <div className="py-2 flex justify-between">
-                  <span className="text-slate-500">Data de Registro no Sistema</span>
-                  <span className="font-mono text-slate-500">{formatDate(process.createdAt || process.created_at)}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ABA 2: INTIMAÇÕES E PUBLICAÇÕES DJE */}
-          {activeTab === 'publicacoes' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <div>
-                  <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">Diário de Justiça & Notificações</h4>
-                  <p className="text-[11px] text-slate-500">Intimações recebidas via varredura do Gmail / DJE vinculadas a este processo</p>
-                </div>
-              </div>
-
-              {loadingPubs ? (
-                <div className="py-12 text-center text-slate-400">Carregando intimações do caso...</div>
-              ) : publicacoes.length === 0 ? (
-                <div className="py-12 text-center bg-white border border-slate-200 rounded-lg p-6">
-                  <Bell className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="font-semibold text-slate-700">Nenhuma intimação registrada para estes autos</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">As publicações importadas pelo script do Gmail aparecerão aqui automaticamente.</p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {publicacoes.map((pub: any) => (
-                    <div key={pub.id} className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                          {pub.court || 'TJ-BA'}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-400">
-                          {formatDate(pub.publication_date || pub.date)}
-                        </span>
-                      </div>
-                      <p className="text-slate-800 leading-relaxed font-mono text-[11px] whitespace-pre-wrap bg-slate-50 p-3 rounded border border-slate-100">
-                        {pub.content}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ABA 3: PRAZOS E AUDIÊNCIAS */}
-          {activeTab === 'tarefas' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <div>
-                  <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">Compromissos e Prazos Fatais</h4>
-                  <p className="text-[11px] text-slate-500">Contestações, recursos e audiências agendadas</p>
-                </div>
-              </div>
-
-              {loadingTarefas ? (
-                <div className="py-12 text-center text-slate-400">Carregando prazos...</div>
-              ) : tarefas.length === 0 ? (
-                <div className="py-12 text-center bg-white border border-slate-200 rounded-lg p-6">
-                  <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="font-semibold text-slate-700">Nenhum prazo pendente para este processo</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Você pode criar tarefas vinculadas a este processo pelo módulo de Prazos.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-lg overflow-hidden">
-                  {tarefas.map((tarefa: any) => {
-                    const isDone = tarefa.status === 'concluida';
-                    return (
-                      <div key={tarefa.id} className="p-3.5 flex items-center justify-between gap-3">
-                        <div className="space-y-1 min-w-0">
-                          <p className={`font-semibold ${isDone ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                            {tarefa.title}
-                          </p>
-                          <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono">
-                            <span>Vencimento: {formatDate(tarefa.due_date)}</span>
-                            {tarefa.assigned_user?.name && <span>Resp: {tarefa.assigned_user.name}</span>}
-                          </div>
-                        </div>
-
-                        {!isDone && (
-                          <button
-                            onClick={() => completeTaskMutation.mutate(tarefa.id)}
-                            className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 transition flex items-center gap-1"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Cumprir
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ABA 4: PASTA DIGITAL (DOCUMENTOS) COM GERADOR INTELIGENTE */}
+          {/* ABA DOCUMENTOS / PASTA DIGITAL */}
           {activeTab === 'documentos' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                 <div>
                   <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">Peças e Pasta Digital</h4>
-                  <p className="text-[11px] text-slate-500">Petições, procurações, comprovantes e minutas do processo</p>
+                  <p className="text-[11px] text-slate-500">Minutas salvas, procurações e documentos probatórios</p>
                 </div>
 
-                {/* Botão de Criação a partir de Modelo */}
                 <button
                   type="button"
                   onClick={() => setModalGerarDocAberto(true)}
@@ -387,28 +280,30 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
               ) : documentos.length === 0 ? (
                 <div className="py-12 text-center bg-white border border-slate-200 rounded-lg p-6">
                   <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="font-semibold text-slate-700">Nenhum documento anexado aos autos</p>
+                  <p className="font-semibold text-slate-700">Nenhum documento salvo nos autos</p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Utilize o botão acima para gerar procurações e declarações preenchidas automaticamente.
+                    Gere procurações ou minutas no botão acima para salvar na Pasta Digital.
                   </p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-lg overflow-hidden">
                   {documentos.map((doc: any) => (
-                    <div key={doc.id} className="p-3 flex items-center justify-between gap-3">
+                    <div key={doc.id} className="p-3 flex items-center justify-between gap-3 hover:bg-slate-50/80 transition-colors">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <FileText className="w-4 h-4 text-slate-500 shrink-0" />
+                        <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-900 truncate">{doc.name}</p>
+                          <p className="font-medium text-slate-900 truncate">{doc.name || doc.title}</p>
                           <span className="text-[10px] text-slate-400 font-mono">{formatDate(doc.created_at)}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <button className="p-1 text-slate-400 hover:text-slate-800 rounded">
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={() => handleAbrirDoc(doc)}
+                          className="px-2 py-1 text-slate-700 hover:bg-slate-200/70 border border-slate-200 rounded flex items-center gap-1 text-[11px] font-medium"
+                          title="Visualizar e Editar Texto"
+                        >
                           <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        <button className="p-1 text-slate-400 hover:text-slate-800 rounded">
-                          <Download className="w-3.5 h-3.5" />
+                          <span>Abrir / Editar</span>
                         </button>
                       </div>
                     </div>
@@ -418,51 +313,42 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
             </div>
           )}
 
-          {/* ABA 5: FINANCEIRO DO PROCESSO */}
-          {activeTab === 'financeiro' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <div>
-                  <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">Honorários e Custas Processuais</h4>
-                  <p className="text-[11px] text-slate-500">Valores faturados, recebidos e pendentes neste processo</p>
+          {/* DEMAIS ABAS */}
+          {activeTab === 'publicacoes' && (
+            <div className="space-y-2">
+              {publicacoes.map((pub: any) => (
+                <div key={pub.id} className="p-3 bg-white border rounded">
+                  <p className="text-[11px] text-slate-700 font-mono">{pub.content}</p>
                 </div>
-              </div>
+              ))}
+            </div>
+          )}
 
-              {loadingFin ? (
-                <div className="py-12 text-center text-slate-400">Carregando financeiro...</div>
-              ) : lancamentos.length === 0 ? (
-                <div className="py-12 text-center bg-white border border-slate-200 rounded-lg p-6">
-                  <DollarSign className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="font-semibold text-slate-700">Nenhum lançamento financeiro vinculado</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Cadastre honorários vinculados ao número deste processo na aba Financeiro.</p>
+          {activeTab === 'tarefas' && (
+            <div className="space-y-2">
+              {tarefas.map((tar: any) => (
+                <div key={tar.id} className="p-3 bg-white border rounded flex justify-between">
+                  <span>{tar.title}</span>
+                  <span className="font-mono text-slate-400">{formatDate(tar.due_date)}</span>
                 </div>
-              ) : (
-                <div className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-lg overflow-hidden">
-                  {lancamentos.map((l: any) => {
-                    const isExpense = l.type === 'despesa';
-                    return (
-                      <div key={l.id} className="p-3.5 flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-slate-900">{l.description}</p>
-                          <span className="text-[10px] text-slate-400 font-mono">Venc: {formatDate(l.due_date)}</span>
-                        </div>
-                        <div className="text-right font-mono">
-                          <span className={`font-bold ${isExpense ? 'text-rose-700' : 'text-emerald-700'}`}>
-                            {isExpense ? '-' : '+'}R$ {Number(l.value || l.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                          <span className="block text-[10px] text-slate-400 capitalize">{l.status}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'financeiro' && (
+            <div className="space-y-2">
+              {lancamentos.map((l: any) => (
+                <div key={l.id} className="p-3 bg-white border rounded flex justify-between">
+                  <span>{l.description}</span>
+                  <span className="font-mono font-bold text-emerald-700">R$ {Number(l.value).toFixed(2)}</span>
                 </div>
-              )}
+              ))}
             </div>
           )}
 
         </div>
 
-        {/* Rodapé da Ficha */}
+        {/* Rodapé */}
         <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0">
           <button
             onClick={onClose}
@@ -474,7 +360,55 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
 
       </div>
 
-      {/* Modal Inteligente de Geração de Peças */}
+      {/* MODAL DE LEITURA E EDIÇÃO DO DOCUMENTO JÁ GRAVADO */}
+      {viewingDoc && (
+        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-2xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden text-xs">
+            <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-indigo-600" />
+                <h3 className="font-bold text-slate-900 text-sm truncate max-w-md">{viewingDoc.name || viewingDoc.title}</h3>
+              </div>
+              <button onClick={() => setViewingDoc(null)} className="p-1 text-slate-400 hover:text-slate-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 flex-1 overflow-hidden bg-slate-100 flex flex-col">
+              <textarea
+                value={editDocText}
+                onChange={(e) => setEditDocText(e.target.value)}
+                className="w-full flex-1 p-4 bg-white border border-slate-300 rounded-lg font-mono text-xs text-slate-900 leading-relaxed resize-none focus:outline-none shadow-inner overflow-y-auto"
+                placeholder="Conteúdo do documento..."
+              />
+            </div>
+
+            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Edite o texto acima e clique em Salvar Alterações.</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingDoc(null)}
+                  className="px-3.5 py-1.5 border border-slate-300 rounded-md hover:bg-slate-100 text-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateDocMutation.mutate()}
+                  disabled={updateDocMutation.isPending}
+                  className="px-4 py-1.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 font-medium flex items-center gap-1.5 shadow-2xs"
+                >
+                  {updateDocMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>Salvar Alterações</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gerador */}
       {modalGerarDocAberto && (
         <GenerateDocumentModal
           process={process}

@@ -422,4 +422,3 @@ const Processes: React.FC = () => {
 };
 
 export default Processes;
-```[cite: 23]

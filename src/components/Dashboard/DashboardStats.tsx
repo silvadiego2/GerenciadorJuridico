@@ -1,10 +1,11 @@
+// src/components/Dashboard/DashboardStats.tsx
 import React from 'react';
 import { 
   Users, 
-  AlertTriangle, 
+  Clock, 
   DollarSign, 
   BookOpen,
-  FolderKanban
+  Scale
 } from 'lucide-react';
 import { Dashboard } from '../../types';
 
@@ -22,83 +23,76 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data }) => {
 
   const stats = [
     {
-      name: 'Processos Ativos',
+      name: 'Acervo Ativo',
       value: activeProcesses,
       total: totalProcesses,
-      icon: FolderKanban,
-      color: 'bg-blue-500',
-      bgColor: 'bg-blue-50',
-      textColor: 'text-blue-600',
-      change: totalProcesses > 0 ? `${Math.round((activeProcesses / totalProcesses) * 100)}% ativos` : null,
+      icon: Scale,
+      hint: totalProcesses > 0 ? `${Math.round((activeProcesses / totalProcesses) * 100)}% em andamento` : 'Sem acervo',
+      hintColor: 'text-slate-400',
     },
     {
-      name: 'Clientes',
+      name: 'Clientes Registrados',
       value: clientsCount,
       icon: Users,
-      color: 'bg-green-500',
-      bgColor: 'bg-green-50',
-      textColor: 'text-green-600',
-      change: null,
+      hint: 'Pessoas e empresas',
+      hintColor: 'text-slate-400',
     },
     {
-      name: 'Tarefas Vencidas',
+      name: 'Prazos e Tarefas',
       value: overdueTasks,
-      icon: AlertTriangle,
-      color: 'bg-red-500',
-      bgColor: 'bg-red-50',
-      textColor: 'text-red-600',
-      change: overdueTasks > 0 ? 'Requer atenção' : 'Em dia',
-      changeColor: overdueTasks > 0 ? 'text-red-600' : 'text-green-600',
+      icon: Clock,
+      hint: overdueTasks > 0 ? 'Aguardando cumprimento' : 'Rotina em dia',
+      hintColor: overdueTasks > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600',
     },
     {
-      name: 'Receita Mensal',
+      name: 'Honorários do Mês',
       value: `R$ ${monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       icon: DollarSign,
-      color: 'bg-yellow-500',
-      bgColor: 'bg-yellow-50',
-      textColor: 'text-yellow-600',
-      change: monthlyRevenue > 0 ? 'Mês atual' : 'Sem receitas',
+      hint: monthlyRevenue > 0 ? 'Competência atual' : 'Sem faturamento lançado',
+      hintColor: 'text-slate-400',
     },
     {
-      name: 'Publicações Pendentes',
+      name: 'Publicações DJE',
       value: pendingPublications,
       icon: BookOpen,
-      color: 'bg-purple-500',
-      bgColor: 'bg-purple-50',
-      textColor: 'text-purple-600',
-      change: pendingPublications > 0 ? 'Aguardando ciência' : 'Todas em dia',
-      changeColor: pendingPublications > 0 ? 'text-orange-600' : 'text-green-600',
+      hint: pendingPublications > 0 ? 'Novas intimações' : 'Todas cientes',
+      hintColor: pendingPublications > 0 ? 'text-sky-700 font-medium' : 'text-slate-400',
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
       {stats.map((stat, index) => {
         const IconComponent = stat.icon;
         return (
-          <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div className={`${stat.bgColor} p-3 rounded-lg`}>
-                <IconComponent className={`h-6 w-6 ${stat.textColor}`} />
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <div className="flex items-baseline justify-end">
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {stat.value}
-                  </p>
-                  {Boolean(stat.total) && (
-                    <p className="ml-2 text-sm text-gray-500">
-                      / {stat.total}
-                    </p>
-                  )}
-                </div>
-                {stat.change && (
-                  <p className={`text-xs mt-1 ${stat.changeColor || 'text-gray-500'}`}>
-                    {stat.change}
-                  </p>
+          <div 
+            key={index} 
+            className="bg-white rounded-lg border border-slate-200 p-3.5 shadow-2xs hover:border-slate-300 transition-colors flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500 truncate mr-2">
+                {stat.name}
+              </span>
+              <IconComponent className="h-4 w-4 text-slate-400 shrink-0" />
+            </div>
+
+            <div className="mt-2.5 flex items-baseline justify-between">
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 tracking-tight">
+                  {stat.value}
+                </span>
+                {Boolean(stat.total) && (
+                  <span className="text-xs text-slate-400 font-mono">
+                    /{stat.total}
+                  </span>
                 )}
               </div>
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] sm:text-[11px]">
+              <span className={stat.hintColor}>
+                {stat.hint}
+              </span>
             </div>
           </div>
         );

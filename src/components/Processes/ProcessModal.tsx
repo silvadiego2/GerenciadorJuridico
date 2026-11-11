@@ -1,3 +1,4 @@
+// src/components/Processes/ProcessModal.tsx
 import React, { useState, useEffect } from 'react';
 import { X, Scale, User, FileText, Building, MapPin, DollarSign, Calendar } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -30,7 +31,6 @@ const ProcessModal: React.FC<ProcessModalProps> = ({ process, onSave, onClose, i
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Buscar lista de clientes para o dropdown
   const { data: clientsData, isLoading: loadingClients } = useQuery({
     queryKey: ['clients'],
     queryFn: () => clientsService.getAll(),
@@ -122,31 +122,43 @@ const ProcessModal: React.FC<ProcessModalProps> = ({ process, onSave, onClose, i
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {process ? 'Editar Processo' : 'Novo Processo'}
-          </h2>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden text-xs">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded bg-slate-900 text-white flex items-center justify-center shrink-0">
+              <Scale className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                {process ? 'Editar Autos Processuais' : 'Cadastrar Novo Processo'}
+              </h2>
+              <p className="text-[11px] text-slate-400">Preencha os dados da ação judicial e vincule as partes</p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Informações Básicas */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Básicas</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Formulário com rolagem */}
+        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 flex-1">
+          {/* Dados Principais */}
+          <div className="space-y-3">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pb-1 border-b border-slate-100">
+              Identificação & Partes
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Número do Processo *
+                <label className="block text-slate-700 font-medium mb-1">
+                  Número do Processo (CNJ) *
                 </label>
                 <div className="relative">
-                  <Scale className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Scale className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="text"
                     value={formData.number}
@@ -156,25 +168,25 @@ const ProcessModal: React.FC<ProcessModalProps> = ({ process, onSave, onClose, i
                         handleChange('cnj', formatProcessNumber(e.target.value));
                       }
                     }}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.number ? 'border-red-300' : 'border-gray-300'
+                    className={`pl-9 pr-3 py-1.5 w-full border rounded-md font-mono text-xs focus:outline-hidden focus:border-slate-400 ${
+                      errors.number ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 focus:bg-white'
                     }`}
-                    placeholder="0163659-65.2026.8.05.0001"
+                    placeholder="0000000-00.0000.8.05.0000"
                   />
                 </div>
-                {errors.number && <p className="text-red-600 text-sm mt-1">{errors.number}</p>}
+                {errors.number && <p className="text-rose-600 text-[11px] mt-0.5">{errors.number}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cliente Vinculado (Dropdown)
+                <label className="block text-slate-700 font-medium mb-1">
+                  Cliente Vinculado (Promovente)
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <select
                     value={formData.clientId}
                     onChange={(e) => handleChange('clientId', e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
                     disabled={loadingClients}
                   >
                     <option value="">Selecione ou deixe sem vínculo</option>
@@ -187,41 +199,67 @@ const ProcessModal: React.FC<ProcessModalProps> = ({ process, onSave, onClose, i
                 </div>
               </div>
 
-              {/* Partes Processuais */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Autor / Promovente
+                <label className="block text-slate-700 font-medium mb-1">
+                  Autor / Polo Ativo (Texto Livre)
                 </label>
                 <input
                   type="text"
                   value={formData.plaintiff}
                   onChange={(e) => handleChange('plaintiff', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                   placeholder="Nome do Promovente / Autor"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Réu / Promovido
+                <label className="block text-slate-700 font-medium mb-1">
+                  Réu / Polo Passivo
                 </label>
                 <input
                   type="text"
                   value={formData.defendant}
                   onChange={(e) => handleChange('defendant', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                   placeholder="Nome da Empresa ou Réu"
                 />
               </div>
 
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-medium mb-1">
+                  Assunto / Matéria da Ação *
+                </label>
+                <div className="relative">
+                  <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
+                  <input
+                    type="text"
+                    value={formData.subject}
+                    onChange={(e) => handleChange('subject', e.target.value)}
+                    className={`pl-9 pr-3 py-1.5 w-full border rounded-md text-xs focus:outline-hidden focus:border-slate-400 ${
+                      errors.subject ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 focus:bg-white'
+                    }`}
+                    placeholder="Ex: Ação de Cobrança, Obrigação de Fazer, Relação de Consumo"
+                  />
+                </div>
+                {errors.subject && <p className="text-rose-600 text-[11px] mt-0.5">{errors.subject}</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* Dados Judiciais */}
+          <div className="space-y-3 pt-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pb-1 border-b border-slate-100">
+              Dados Judiciais & Valores
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status *
+                <label className="block text-slate-700 font-medium mb-1">
+                  Status
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => handleChange('status', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
                 >
                   <option value="ativo">Ativo</option>
                   <option value="suspenso">Suspenso</option>
@@ -231,115 +269,92 @@ const ProcessModal: React.FC<ProcessModalProps> = ({ process, onSave, onClose, i
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-slate-700 font-medium mb-1">
+                  Fase Processual
+                </label>
+                <select
+                  value={formData.phase}
+                  onChange={(e) => handleChange('phase', e.target.value)}
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
+                >
+                  <option value="conhecimento">Conhecimento</option>
+                  <option value="execução">Execução</option>
+                  <option value="recurso">Recurso</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-medium mb-1">
                   Data de Distribuição
                 </label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="date"
                     value={formData.distributionDate}
                     onChange={(e) => handleChange('distributionDate', e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                   />
                 </div>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Assunto/Matéria *
-                </label>
-                <div className="relative">
-                  <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    value={formData.subject}
-                    onChange={(e) => handleChange('subject', e.target.value)}
-                    className={`pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.subject ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Ex: Procedimento do Juizado Especial Cível, Ação de Cobrança"
-                  />
-                </div>
-                {errors.subject && <p className="text-red-600 text-sm mt-1">{errors.subject}</p>}
-              </div>
-            </div>
-          </div>
-
-          {/* Informações Processuais */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Judiciais</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-slate-700 font-medium mb-1">
                   Classe Processual
                 </label>
                 <input
                   type="text"
                   value={formData.class}
                   onChange={(e) => handleChange('class', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ex: Procedimento do Juizado Especial Cível"
+                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+                  placeholder="Ex: Procedimento Comum"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fase Processual
-                </label>
-                <input
-                  type="text"
-                  value={formData.phase}
-                  onChange={(e) => handleChange('phase', e.target.value)}
-                  className="px-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ex: Conhecimento, Execução, Recurso"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Vara/Tribunal
+                <label className="block text-slate-700 font-medium mb-1">
+                  Tribunal / Vara
                 </label>
                 <div className="relative">
-                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="text"
                     value={formData.court}
                     onChange={(e) => handleChange('court', e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: TJ-BA / 1ª Vara Juizado Especial"
+                    className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+                    placeholder="Ex: TJ-BA / 1ª Vara Cível"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-slate-700 font-medium mb-1">
                   Comarca
                 </label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="text"
                     value={formData.comarca}
                     onChange={(e) => handleChange('comarca', e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                     placeholder="Ex: Salvador, Camaçari"
                   />
                 </div>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="sm:col-span-3">
+                <label className="block text-slate-700 font-medium mb-1">
                   Valor da Causa (R$)
                 </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <div className="relative max-w-xs">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
                   <input
                     type="number"
                     step="0.01"
                     value={formData.value}
                     onChange={(e) => handleChange('value', e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
                     placeholder="0.00"
                   />
                 </div>
@@ -347,20 +362,21 @@ const ProcessModal: React.FC<ProcessModalProps> = ({ process, onSave, onClose, i
             </div>
           </div>
 
-          <div className="flex space-x-3 pt-4">
+          {/* Rodapé fixo dentro da tag form */}
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-3.5 py-1.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isLoading || loadingClients}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="px-4 py-1.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 disabled:opacity-50 transition-colors font-medium shadow-2xs"
             >
-              {isLoading ? 'Salvando...' : (process ? 'Salvar Alterações' : 'Criar Processo')}
+              {isLoading ? 'Salvando...' : (process ? 'Salvar Alterações' : 'Cadastrar Processo')}
             </button>
           </div>
         </form>

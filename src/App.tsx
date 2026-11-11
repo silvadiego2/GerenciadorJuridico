@@ -13,15 +13,11 @@ import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Processes from './pages/Processes';
 import Tasks from './pages/Tasks';
-import Integrations from './pages/Integrations';
 import Documents from './pages/Documents';
 import Financial from './pages/Financial';
 import Publications from './pages/Publications';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
-
-// Módulo de Consulta Processual por OAB
-import { ConsultaProcessosOAB } from './components/ConsultaProcessosOAB';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,11 +47,11 @@ function App() {
               <Route path="clientes" element={<Clients />} />
               <Route path="processos" element={<Processes />} />
               
-              {/* Rota da Consulta por OAB */}
-              <Route path="consulta-oab" element={<ConsultaProcessosOAB />} />
+              {/* Redirecionamento da Consulta OAB e Integrações para a central em Processos */}
+              <Route path="consulta-oab" element={<Navigate to="/processos" replace />} />
+              <Route path="integracoes" element={<Navigate to="/configuracoes" replace />} />
               
               <Route path="tarefas" element={<Tasks />} />
-              <Route path="integracoes" element={<Integrations />} />
               <Route path="documentos" element={<Documents />} />
               <Route path="financeiro" element={<Financial />} />
               <Route path="publicacoes" element={<Publications />} />
@@ -70,7 +66,7 @@ function App() {
                 }
               />
 
-              {/* Redirecionamento da tela duplicada de Usuários para Configurações */}
+              {/* Redirecionamento da rota legada de usuários */}
               <Route
                 path="usuarios"
                 element={<Navigate to="/configuracoes" replace />}

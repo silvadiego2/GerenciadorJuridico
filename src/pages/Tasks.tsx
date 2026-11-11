@@ -1,9 +1,13 @@
+// src/pages/Tasks.tsx
 import React, { useState } from 'react';
-import { Plus, Search, CheckSquare, Clock, AlertTriangle, User, Edit, Trash2, Loader2, Calendar } from 'lucide-react';
+import { 
+  Plus, Search, CheckSquare, Clock, AlertTriangle, User, 
+  Edit2, Trash2, Loader2, Calendar, CheckCircle2, Scale
+} from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksService } from '../lib/api';
 import { Task } from '../types';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
+import { format, isBefore, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import TaskModal from '../components/Tasks/TaskModal';
 import { useNotifications } from '../hooks/useNotifications';
@@ -18,9 +22,8 @@ const Tasks: React.FC = () => {
   
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
 
-  // Query para buscar tarefas
   const { data: tasksData, isLoading, error: queryError } = useQuery({
     queryKey: ['tasks', debouncedSearchTerm, selectedStatus, selectedPriority],
     queryFn: () => tasksService.getAll({
@@ -28,52 +31,42 @@ const Tasks: React.FC = () => {
       status: selectedStatus !== 'all' ? selectedStatus : undefined,
       priority: selectedPriority !== 'all' ? selectedPriority : undefined,
     }),
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 5 * 60 * 1000,
   });
 
   const tasks = tasksData?.tasks || [];
 
-  // Mutation para criar tarefa
   const createTaskMutation = useMutation({
     mutationFn: tasksService.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      success('Sucesso', 'Tarefa criada com sucesso!');
+      success('Sucesso', 'Prazo/tarefa cadastrado com sucesso');
       setIsModalOpen(false);
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao criar tarefa');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao cadastrar tarefa')
   });
 
-  // Mutation para atualizar tarefa
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Task> }) =>
       tasksService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      success('Sucesso', 'Tarefa atualizada com sucesso!');
+      success('Sucesso', 'Tarefa atualizada');
       setIsModalOpen(false);
       setEditingTask(null);
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao atualizar tarefa');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao atualizar tarefa')
   });
 
-  // Mutation para deletar tarefa
   const deleteTaskMutation = useMutation({
     mutationFn: tasksService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      success('Sucesso', 'Tarefa excluída com sucesso!');
+      success('Sucesso', 'Tarefa excluída');
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao excluir tarefa');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao excluir tarefa')
   });
 
-  // Mutation para concluir tarefa
   const completeTaskMutation = useMutation({
     mutationFn: (taskId: string) => 
       tasksService.update(taskId, { 
@@ -82,17 +75,10 @@ const Tasks: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      success('Sucesso', 'Tarefa concluída!');
+      success('Sucesso', 'Prazo cumprido com sucesso!');
     },
-    onError: (err: any) => {
-      error('Erro', err.message || 'Erro ao concluir tarefa');
-    },
+    onError: (err: any) => error('Erro', err.message || 'Falha ao concluir')
   });
-
-  const handleCreateTask = () => {
-    setEditingTask(null);
-    setIsModalOpen(true);
-  };
 
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
@@ -100,13 +86,9 @@ const Tasks: React.FC = () => {
   };
 
   const handleDeleteTask = (taskId: string, taskTitle: string) => {
-    if (window.confirm(`Tem certeza que deseja excluir a tarefa "${taskTitle}"?`)) {
+    if (window.confirm(`Excluir permanentemente o prazo "${taskTitle}"?`)) {
       deleteTaskMutation.mutate(taskId);
     }
-  };
-
-  const handleCompleteTask = (taskId: string) => {
-    completeTaskMutation.mutate(taskId);
   };
 
   const handleSaveTask = (taskData: Partial<Task>) => {
@@ -117,257 +99,212 @@ const Tasks: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'pendente':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'em_andamento':
-        return 'bg-blue-100 text-blue-800';
-      case 'concluida':
-        return 'bg-green-100 text-green-800';
-      case 'cancelada':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'pendente': return 'bg-amber-50 text-amber-800 border-amber-200';
+      case 'em_andamento': return 'bg-sky-50 text-sky-800 border-sky-200';
+      case 'concluida': return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+      case 'cancelada': return 'bg-slate-100 text-slate-600 border-slate-200';
+      default: return 'bg-slate-50 text-slate-700 border-slate-200';
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityBadge = (priority: string) => {
     switch (priority) {
-      case 'urgente':
-        return 'bg-red-50 text-red-700 border-red-200';
-      case 'alta':
-        return 'bg-orange-50 text-orange-700 border-orange-200';
-      case 'media':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-      case 'baixa':
-        return 'bg-green-50 text-green-700 border-green-200';
-      default:
-        return 'bg-gray-50 text-gray-700 border-gray-200';
+      case 'urgente': return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'alta': return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'media': return 'bg-slate-100 text-slate-700 border-slate-200';
+      case 'baixa': return 'bg-slate-50 text-slate-600 border-slate-200';
+      default: return 'bg-slate-50 text-slate-700 border-slate-200';
     }
   };
 
   const getTaskUrgency = (task: Task) => {
+    if (!task.dueDate) return null;
     const now = new Date();
     const dueDate = new Date(task.dueDate);
     
-    if (isBefore(dueDate, now)) {
-      return { type: 'overdue', label: 'Vencida', color: 'text-red-600' };
-    } else if (isBefore(dueDate, addDays(now, 3))) {
-      return { type: 'urgent', label: 'Vence em breve', color: 'text-orange-600' };
-    } else {
-      return { type: 'normal', label: 'No prazo', color: 'text-green-600' };
+    if (isBefore(dueDate, now) && task.status !== 'concluida') {
+      return { label: 'Prazo Vencido', color: 'text-rose-600 font-semibold' };
+    } else if (isBefore(dueDate, addDays(now, 3)) && task.status !== 'concluida') {
+      return { label: 'Vence em breve', color: 'text-amber-600 font-medium' };
     }
+    return { label: 'No prazo', color: 'text-slate-500' };
   };
 
   if (queryError) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Erro ao carregar tarefas: {(queryError as Error).message}</p>
+      <div className="p-4 sm:p-6">
+        <div className="bg-rose-50 border border-rose-200 rounded-md p-4 text-xs text-rose-800">
+          Erro ao carregar prazos: {(queryError as Error).message}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-4">
+      {/* Topo */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tarefas</h1>
-          <p className="text-gray-600">Gerencie suas tarefas e prazos</p>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Tarefas e Prazos</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Acompanhamento de prazos fatais, audiências e diligências</p>
         </div>
-        <button 
-          onClick={handleCreateTask}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Nova Tarefa</span>
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button 
+            type="button"
+            onClick={() => { setEditingTask(null); setIsModalOpen(true); }}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-2xs"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Novo Prazo</span>
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Buscar tarefas..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todos os status</option>
-            <option value="pendente">Pendente</option>
-            <option value="em_andamento">Em Andamento</option>
-            <option value="concluida">Concluída</option>
-            <option value="cancelada">Cancelada</option>
-          </select>
-          <select
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Todas as prioridades</option>
-            <option value="urgente">Urgente</option>
-            <option value="alta">Alta</option>
-            <option value="media">Média</option>
-            <option value="baixa">Baixa</option>
-          </select>
+      <div className="bg-white p-3 rounded-lg border border-slate-200 flex flex-col sm:flex-row gap-2.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por descrição, processo ou responsável..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+          />
         </div>
+
+        <select
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value as any)}
+          className="px-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
+        >
+          <option value="all">Todos os status</option>
+          <option value="pendente">Pendente</option>
+          <option value="em_andamento">Em Andamento</option>
+          <option value="concluida">Concluída</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+
+        <select
+          value={selectedPriority}
+          onChange={(e) => setSelectedPriority(e.target.value as any)}
+          className="px-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-hidden focus:border-slate-400"
+        >
+          <option value="all">Todas as prioridades</option>
+          <option value="urgente">Urgente</option>
+          <option value="alta">Alta</option>
+          <option value="media">Média</option>
+          <option value="baixa">Baixa</option>
+        </select>
       </div>
 
-      {/* Lista de Tarefas */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {isLoading ? 'Carregando...' : `${tasks.length} tarefa${tasks.length !== 1 ? 's' : ''} encontrada${tasks.length !== 1 ? 's' : ''}`}
-            </h2>
-            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
-          </div>
+      {/* Lista */}
+      <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            {isLoading ? 'Carregando tarefas...' : `${tasks.length} prazo${tasks.length !== 1 ? 's' : ''} registrado${tasks.length !== 1 ? 's' : ''}`}
+          </h2>
+          {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-600" />}
         </div>
-        
+
         {isLoading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-500">Carregando tarefas...</p>
+          <div className="p-12 text-center text-slate-400 text-xs">
+            <Loader2 className="h-5 w-5 animate-spin text-slate-600 mx-auto mb-2" />
+            Carregando agenda...
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="p-12 text-center text-slate-400">
+            <CheckSquare className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-xs font-medium text-slate-700">Nenhum prazo pendente</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {tasks.map((task) => {
+          <div className="divide-y divide-slate-100">
+            {tasks.map((task: any) => {
               const urgency = getTaskUrgency(task);
+              const isDone = task.status === 'concluida';
+
               return (
-                <div key={task.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <CheckSquare className="h-6 w-6 text-blue-600" />
+                <div key={task.id} className="p-4 hover:bg-slate-50/80 transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className={`text-xs font-semibold ${isDone ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                          {task.title}
+                        </h3>
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold border rounded-sm capitalize ${getStatusBadge(task.status)}`}>
+                          {task.status?.replace('_', ' ')}
+                        </span>
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold border rounded-sm capitalize ${getPriorityBadge(task.priority)}`}>
+                          {task.priority}
+                        </span>
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {task.title}
-                          </h3>
-                          <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(task.status)}`}>
-                            {task.status.replace('_', ' ').charAt(0).toUpperCase() + task.status.replace('_', ' ').slice(1)}
-                          </span>
-                          <span className={`px-2 py-1 rounded-md border text-xs ${getPriorityColor(task.priority)}`}>
-                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                          </span>
+
+                      {task.description && (
+                        <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                          {task.description}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 pt-1">
+                        <div className="flex items-center gap-1 font-mono">
+                          <Clock className="h-3.5 w-3.5 text-slate-400" />
+                          <span>Vencimento: {task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy HH:mm", { locale: ptBR }) : '-'}</span>
+                          {urgency && <span className={`ml-1 ${urgency.color}`}>({urgency.label})</span>}
                         </div>
-                        
-                        {task.description && (
-                          <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-                        )}
-                        
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                          <div className="flex items-center space-x-1">
-                            <Clock className="h-4 w-4" />
-                            <span>Vence em {format(new Date(task.dueDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
-                            <span className={`ml-2 font-medium ${urgency.color}`}>
-                              ({urgency.label})
-                            </span>
+
+                        {task.process?.number && (
+                          <div className="flex items-center gap-1">
+                            <Scale className="h-3.5 w-3.5 text-slate-400" />
+                            <span className="font-mono text-slate-700">{task.process.number}</span>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-4 text-sm text-gray-600">
-                          {task.assigned_user && (
-                            <div className="flex items-center space-x-1">
-                              <User className="h-4 w-4" />
-                              <span>{task.assigned_user.name}</span>
-                            </div>
-                          )}
-                          
-                          {task.process && (
-                            <div className="flex items-center space-x-1">
-                              <span className="font-medium">Processo:</span>
-                              <span className="font-mono text-xs">{task.process.number}</span>
-                            </div>
-                          )}
-                          
-                          {task.client && (
-                            <div className="flex items-center space-x-1">
-                              <span className="font-medium">Cliente:</span>
-                              <span>{task.client.name}</span>
-                            </div>
-                          )}
-                        </div>
+                        )}
+
+                        {task.assignedUser?.name && (
+                          <div className="flex items-center gap-1">
+                            <User className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{task.assignedUser.name}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-2 ml-4">
-                      {task.status !== 'concluida' && task.status !== 'cancelada' && (
-                        <button 
-                          onClick={() => handleCompleteTask(task.id)}
+
+                    <div className="flex items-center gap-1 sm:self-center shrink-0">
+                      {!isDone && (
+                        <button
+                          onClick={() => completeTaskMutation.mutate(task.id)}
                           disabled={completeTaskMutation.isPending}
-                          className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 disabled:opacity-50 transition-colors"
+                          className="px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors flex items-center gap-1"
                         >
-                          {completeTaskMutation.isPending ? 'Concluindo...' : 'Concluir'}
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>Concluir</span>
                         </button>
                       )}
-                      <button 
+                      <button
                         onClick={() => handleEditTask(task)}
-                        className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                        className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                        title="Editar"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit2 className="h-3.5 w-3.5" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDeleteTask(task.id, task.title)}
-                        disabled={deleteTaskMutation.isPending}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                        title="Excluir"
                       >
-                        {deleteTaskMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
-                    </div>
-                  </div>
-                  
-                  {/* Informações Adicionais */}
-                  <div className="mt-4 text-sm text-gray-600">
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="h-4 w-4" />
-                      <span>
-                        Criada em {format(new Date(task.createdAt), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                      </span>
-                      {task.completedAt && (
-                        <>
-                          <span>•</span>
-                          <span>
-                            Concluída em {format(new Date(task.completedAt), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                          </span>
-                        </>
-                      )}
                     </div>
                   </div>
                 </div>
               );
             })}
-            
-            {tasks.length === 0 && (
-              <div className="p-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckSquare className="h-8 w-8 text-gray-400" />
-                </div>
-                <p className="text-gray-500">Nenhuma tarefa encontrada com os filtros aplicados</p>
-              </div>
-            )}
           </div>
         )}
       </div>
 
-      {/* Modal de Tarefa */}
       {isModalOpen && (
         <TaskModal
           task={editingTask}

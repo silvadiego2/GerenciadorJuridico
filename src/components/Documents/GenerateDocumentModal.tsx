@@ -741,18 +741,21 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 </div>
               )}
 
-              {/* Editor Enriquecido (contentEditable) — Permite alinhar linha a linha */}
-              <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                className="w-full flex-1 border-none focus:outline-hidden bg-transparent text-slate-900 relative z-10 p-0 leading-relaxed outline-hidden"
-                style={{
-                  fontFamily: 'inherit',
-                  fontSize: 'inherit',
-                  lineHeight: 'inherit'
-                }}
-              />
+{/* Editor Enriquecido com Foco Garantido e Eventos Liberados */}
+<div
+  ref={editorRef}
+  contentEditable={true}
+  suppressContentEditableWarning={true}
+  tabIndex={0}
+  onClick={() => editorRef.current?.focus()}
+  className="w-full min-h-[500px] flex-1 border-none focus:outline-none bg-transparent text-slate-900 relative z-20 p-2 leading-relaxed cursor-text select-text pointer-events-auto"
+  style={{
+    fontFamily: 'inherit',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    minHeight: '200mm'
+  }}
+/>
 
               {/* Rodapé da Folha */}
               {!isPaginaInteiraAtiva && pageSettings.exibirRodape && (

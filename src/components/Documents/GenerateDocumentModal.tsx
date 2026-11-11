@@ -4,7 +4,7 @@ import {
   X, FileText, Copy, Printer, Check, 
   Sparkles, Save, Loader2, Settings2, Upload,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  Image as ImageIcon, Trash2
+  Trash2, Layers
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
@@ -27,15 +27,16 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [painelConfigAberto, setPainelConfigAberto] = useState(false);
   
-  // Alinhamento manual de texto
+  // Alinhamento do texto
   const [textAlign, setTextAlign] = useState<'justify' | 'left' | 'center' | 'right'>('justify');
 
-  // Timbrado em imagem (Base64)
+  // Imagem do Timbrado (Base64)
   const [timbradoImage, setTimbradoImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Configurações da Página A4
+  // Configurações da Página A4 e Timbrado
   const [pageSettings, setPageSettings] = useState({
+    modoTimbrado: 'cabecalho' as 'cabecalho' | 'pagina_inteira',
     fontFamily: 'Times New Roman' as 'Times New Roman' | 'Arial' | 'Calibri',
     fontSize: '12pt',
     lineHeight: '1.5',
@@ -43,6 +44,8 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     exibirRodape: true,
     posicaoLogo: 'split' as 'left' | 'center' | 'split',
     marcaDaguaTexto: '',
+    margemSuperiorPaginaInteira: '35mm', // Recuo do texto para não cobrir o cabeçalho desenhado no fundo A4
+    margemInferiorPaginaInteira: '25mm',
     escritorioNome: 'SILVA ADVOCACIA & CONSULTORIA JURÍDICA',
     escritorioOab: 'OAB/BA nº 12.345',
     escritorioEndereco: 'Av. Tancredo Neves, Salvador/BA',
@@ -52,7 +55,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
 
-  // Carrega os modelos cadastrados
+  // Carrega modelos
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ['document-templates'],
     queryFn: async () => {
@@ -65,7 +68,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     }
   });
 
-  // Busca dados completos do cliente
+  // Busca dados do cliente
   const { data: clientData } = useQuery({
     queryKey: ['client-for-template', process?.client_id || process?.clientId],
     queryFn: async () => {
@@ -98,12 +101,11 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     }
   }, [selectedTemplateId, templates, process, clientData]);
 
-  // Upload local de imagem de timbrado
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('A imagem do timbrado deve ter até 2MB.');
+      if (file.size > 4 * 1024 * 1024) {
+        alert('A imagem do timbrado deve ter até 4MB.');
         return;
       }
       const reader = new FileReader();
@@ -114,7 +116,6 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     }
   };
 
-  // Salvar na Pasta Digital
   const saveDocumentMutation = useMutation({
     mutationFn: async () => {
       const tpl = templates.find((t: any) => t.id === selectedTemplateId);
@@ -152,13 +153,15 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Motor de Impressão Direta A4 com Timbrado e Alinhamento
+  // Motor de Impressão Direta A4 com suporte a Página Inteira
   const handlePrint = () => {
     const win = window.open('', '', 'width=850,height=950');
     if (!win) return;
 
+    const isPaginaInteira = pageSettings.modoTimbrado === 'pagina_inteira' && timbradoImage;
+
     let cabecalhoHtml = '';
-    if (pageSettings.exibirCabecalho) {
+    if (!isPaginaInteira && pageSettings.exibirCabecalho) {
       if (pageSettings.posicaoLogo === 'center' && timbradoImage) {
         cabecalhoHtml = `
           <div class="print-header" style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 24px;">
@@ -185,7 +188,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
       }
     }
 
-    const rodapeHtml = pageSettings.exibirRodape ? `
+    const rodapeHtml = (!isPaginaInteira && pageSettings.exibirRodape) ? `
       <div class="print-footer" style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin-top: 32px; font-size: 8pt; color: #64748b; text-align: center; line-height: 1.4;">
         <p style="margin: 0;">${pageSettings.escritorioEndereco} • ${pageSettings.escritorioContato}</p>
       </div>
@@ -193,6 +196,10 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
 
     const marcaDaguaHtml = pageSettings.marcaDaguaTexto ? `
       <div class="watermark">${pageSettings.marcaDaguaTexto}</div>
+    ` : '';
+
+    const fundoPaginaInteiraHtml = isPaginaInteira ? `
+      <img class="full-page-bg" src="${timbradoImage}" />
     ` : '';
 
     win.document.write(`
@@ -203,7 +210,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
           <style>
             @page {
               size: A4 portrait;
-              margin: 25mm 20mm 20mm 25mm;
+              margin: ${isPaginaInteira ? '0' : '25mm 20mm 20mm 25mm'};
             }
             body {
               font-family: '${pageSettings.fontFamily}', serif;
@@ -211,8 +218,19 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
               line-height: ${pageSettings.lineHeight};
               color: #0f172a;
               margin: 0;
-              padding: 0;
+              padding: ${isPaginaInteira ? `${pageSettings.margemSuperiorPaginaInteira} 20mm ${pageSettings.margemInferiorPaginaInteira} 25mm` : '0'};
               position: relative;
+              box-sizing: border-box;
+            }
+            .full-page-bg {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100vw;
+              height: 100vh;
+              object-fit: cover;
+              z-index: -2;
+              pointer-events: none;
             }
             pre {
               white-space: pre-wrap;
@@ -221,6 +239,8 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
               line-height: inherit;
               margin: 0;
               text-align: ${textAlign};
+              position: relative;
+              z-index: 1;
             }
             .watermark {
               position: fixed;
@@ -241,6 +261,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
           </style>
         </head>
         <body>
+          ${fundoPaginaInteiraHtml}
           ${marcaDaguaHtml}
           ${cabecalhoHtml}
           <pre>${renderedContent}</pre>
@@ -257,11 +278,13 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
     win.document.close();
   };
 
+  const isPaginaInteiraAtiva = pageSettings.modoTimbrado === 'pagina_inteira' && Boolean(timbradoImage);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-5xl h-[94vh] flex flex-col overflow-hidden text-xs">
         
-        {/* Cabeçalho Superior */}
+        {/* Cabeçalho do Modal */}
         <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
@@ -288,7 +311,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
               }`}
             >
               <Settings2 className="h-3.5 w-3.5" />
-              <span>Configurar Timbrado & Folha</span>
+              <span>Configurar Timbrado & Layout</span>
             </button>
 
             <button
@@ -300,31 +323,59 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
           </div>
         </div>
 
-        {/* Painel de Configurações e Upload */}
+        {/* Painel Retrátil de Configurações */}
         {painelConfigAberto && (
-          <div className="bg-slate-900 text-slate-200 p-4 border-b border-slate-800 animate-in slide-in-from-top-2 duration-150 shrink-0 text-xs">
+          <div className="bg-slate-900 text-slate-200 p-4 border-b border-slate-800 animate-in slide-in-from-top-2 duration-150 shrink-0 text-xs space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               
-              {/* Upload de Imagem */}
+              {/* Modo de Timbrado */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Logo / Imagem do Timbrado
+                  Modo de Aplicação do Timbrado
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 bg-slate-800 p-1 rounded border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setPageSettings({ ...pageSettings, modoTimbrado: 'cabecalho' })}
+                    className={`py-1 rounded text-[11px] font-medium transition ${
+                      pageSettings.modoTimbrado === 'cabecalho' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Cabeçalho
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageSettings({ ...pageSettings, modoTimbrado: 'pagina_inteira' })}
+                    className={`py-1 rounded text-[11px] font-medium transition ${
+                      pageSettings.modoTimbrado === 'pagina_inteira' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Página Inteira
+                  </button>
+                </div>
+              </div>
+
+              {/* Upload da Imagem */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  {pageSettings.modoTimbrado === 'pagina_inteira' ? 'Arquivo da Folha A4 Inteira' : 'Logo / Brasão do Cabeçalho'}
                 </label>
                 <input 
                   type="file" 
                   ref={fileInputRef} 
                   onChange={handleImageUpload} 
-                  accept="image/png,image/jpeg,image/svg+xml" 
+                  accept="image/png,image/jpeg,image/webp" 
                   className="hidden" 
                 />
                 {timbradoImage ? (
                   <div className="flex items-center gap-2 bg-slate-800 p-1.5 rounded border border-slate-700">
                     <img src={timbradoImage} alt="Timbrado" className="h-7 w-auto max-w-[80px] object-contain rounded bg-white p-0.5" />
+                    <span className="text-[10px] text-emerald-400 font-mono">Carregado</span>
                     <button
                       type="button"
                       onClick={() => setTimbradoImage(null)}
                       className="text-rose-400 hover:text-rose-300 p-1 ml-auto"
-                      title="Remover logo"
+                      title="Remover imagem"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -336,7 +387,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                     className="w-full py-1.5 px-2 bg-slate-800 border border-dashed border-slate-700 hover:border-slate-500 rounded text-slate-300 flex items-center justify-center gap-1.5 transition text-[11px]"
                   >
                     <Upload className="h-3.5 w-3.5" />
-                    <span>Carregar Brasão / Logo</span>
+                    <span>Upload de Timbrado</span>
                   </button>
                 )}
               </div>
@@ -357,7 +408,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
 
               {/* Tamanho e Entrelinhas */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tamanho & Entrelinhas</label>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tamanho & Espaçamento</label>
                 <div className="flex gap-2">
                   <select
                     value={pageSettings.fontSize}
@@ -380,62 +431,66 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 </div>
               </div>
 
-              {/* Marca D'Água */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Marca d'Água Central</label>
-                <input
-                  type="text"
-                  placeholder="Ex: MINUTA, CONFIDENCIAL"
-                  value={pageSettings.marcaDaguaTexto}
-                  onChange={(e) => setPageSettings({ ...pageSettings, marcaDaguaTexto: e.target.value })}
-                  className="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-200 uppercase font-mono text-[11px]"
-                />
-              </div>
-
             </div>
 
-            {/* Segunda linha de opções */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-800 text-[11px]">
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pageSettings.exibirCabecalho}
-                    onChange={(e) => setPageSettings({ ...pageSettings, exibirCabecalho: e.target.checked })}
-                    className="rounded border-slate-700 text-indigo-500"
-                  />
-                  <span>Cabeçalho Ativo</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pageSettings.exibirRodape}
-                    onChange={(e) => setPageSettings({ ...pageSettings, exibirRodape: e.target.checked })}
-                    className="rounded border-slate-700 text-indigo-500"
-                  />
-                  <span>Rodapé Institucional</span>
-                </label>
-              </div>
-
-              {timbradoImage && (
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400">Posição do Timbrado:</span>
-                  <button
-                    type="button"
-                    onClick={() => setPageSettings({ ...pageSettings, posicaoLogo: 'split' })}
-                    className={`px-2 py-0.5 rounded ${pageSettings.posicaoLogo === 'split' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}
-                  >
-                    Lateral
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPageSettings({ ...pageSettings, posicaoLogo: 'center' })}
-                    className={`px-2 py-0.5 rounded ${pageSettings.posicaoLogo === 'center' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}
-                  >
-                    Topo Central
-                  </button>
+            {/* Ajustes avançados caso seja Página Inteira ou Cabeçalho */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-800 text-[11px]">
+              {pageSettings.modoTimbrado === 'pagina_inteira' ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-400">Recuo do Texto no Fundo A4:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500">Superior:</span>
+                    <input
+                      type="text"
+                      value={pageSettings.margemSuperiorPaginaInteira}
+                      onChange={(e) => setPageSettings({ ...pageSettings, margemSuperiorPaginaInteira: e.target.value })}
+                      className="w-16 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-center font-mono"
+                      placeholder="35mm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500">Inferior:</span>
+                    <input
+                      type="text"
+                      value={pageSettings.margemInferiorPaginaInteira}
+                      onChange={(e) => setPageSettings({ ...pageSettings, margemInferiorPaginaInteira: e.target.value })}
+                      className="w-16 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-center font-mono"
+                      placeholder="25mm"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pageSettings.exibirCabecalho}
+                      onChange={(e) => setPageSettings({ ...pageSettings, exibirCabecalho: e.target.checked })}
+                      className="rounded border-slate-700 text-indigo-500"
+                    />
+                    <span>Cabeçalho Superior</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pageSettings.exibirRodape}
+                      onChange={(e) => setPageSettings({ ...pageSettings, exibirRodape: e.target.checked })}
+                      className="rounded border-slate-700 text-indigo-500"
+                    />
+                    <span>Rodapé com Contatos</span>
+                  </label>
                 </div>
               )}
+
+              <div>
+                <input
+                  type="text"
+                  placeholder="Marca D'Água (ex: MINUTA)"
+                  value={pageSettings.marcaDaguaTexto}
+                  onChange={(e) => setPageSettings({ ...pageSettings, marcaDaguaTexto: e.target.value })}
+                  className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200 uppercase font-mono text-[11px] w-48 text-center"
+                />
+              </div>
             </div>
           </div>
         )}
@@ -477,10 +532,10 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
             )}
           </div>
 
-          {/* Coluna Direita: Folha A4 e Barra de Alinhamento */}
+          {/* Coluna Direita: Folha A4 */}
           <div className="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 items-center">
             
-            {/* Barra de Ferramentas da Folha (Alinhamento & Impressão) */}
+            {/* Barra de Alinhamento e Botões de Ação */}
             <div className="w-full max-w-[210mm] flex items-center justify-between pb-3 mb-2 flex-wrap gap-2">
               <div className="flex items-center gap-1 bg-white p-1 rounded-md border border-slate-300 shadow-2xs">
                 <span className="text-[10px] uppercase font-bold text-slate-400 px-1.5">Alinhamento:</span>
@@ -542,13 +597,25 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
 
             {/* Simulação da Folha A4 */}
             <div 
-              className="w-full max-w-[210mm] min-h-[297mm] bg-white border border-slate-300 rounded shadow-md p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden"
+              className="w-full max-w-[210mm] min-h-[297mm] bg-white border border-slate-300 rounded shadow-md flex flex-col justify-between relative overflow-hidden"
               style={{
                 fontFamily: pageSettings.fontFamily,
                 fontSize: pageSettings.fontSize,
-                lineHeight: pageSettings.lineHeight
+                lineHeight: pageSettings.lineHeight,
+                padding: isPaginaInteiraAtiva
+                  ? `${pageSettings.margemSuperiorPaginaInteira} 20mm ${pageSettings.margemInferiorPaginaInteira} 25mm`
+                  : '30mm 20mm 25mm 25mm'
               }}
             >
+              {/* IMAGEM DE TIMBRADO EM PÁGINA INTEIRA (FUNDO TOTAL A4) */}
+              {isPaginaInteiraAtiva && (
+                <img
+                  src={timbradoImage!}
+                  alt="Timbrado Página Inteira"
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none z-0"
+                />
+              )}
+
               {/* Marca D'Água */}
               {pageSettings.marcaDaguaTexto && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
@@ -558,8 +625,8 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 </div>
               )}
 
-              {/* Cabeçalho da Folha */}
-              {pageSettings.exibirCabecalho && (
+              {/* Cabeçalho da Folha (Apenas no Modo Cabeçalho) */}
+              {!isPaginaInteiraAtiva && pageSettings.exibirCabecalho && (
                 <div className={`border-b-2 border-slate-900 pb-3 mb-6 relative z-10 ${
                   pageSettings.posicaoLogo === 'center' && timbradoImage ? 'text-center' : 'flex justify-between items-end'
                 }`}>
@@ -584,7 +651,7 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 </div>
               )}
 
-              {/* Corpo da Peça (com alinhamento dinâmico) */}
+              {/* Corpo da Peça (Editável na Folha) */}
               <textarea
                 value={renderedContent}
                 onChange={(e) => setRenderedContent(e.target.value)}
@@ -597,8 +664,8 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
                 }}
               />
 
-              {/* Rodapé da Folha */}
-              {pageSettings.exibirRodape && (
+              {/* Rodapé da Folha (Apenas no Modo Cabeçalho) */}
+              {!isPaginaInteiraAtiva && pageSettings.exibirRodape && (
                 <div className="border-t border-slate-200 pt-3 mt-8 text-center text-[9px] text-slate-400 font-mono relative z-10">
                   <p>{pageSettings.escritorioEndereco} • {pageSettings.escritorioContato}</p>
                 </div>
@@ -611,7 +678,9 @@ export const GenerateDocumentModal: React.FC<GenerateDocumentModalProps> = ({
         {/* Rodapé do Modal */}
         <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-slate-400">
-            Utilize a barra superior para alinhar o texto (justificado, centralizado ou esquerda) antes de imprimir.
+            {isPaginaInteiraAtiva 
+              ? '✓ Timbrado em Página Inteira ativo: o texto respeita o recuo superior para não sobrepor o cabeçalho desenhado.'
+              : 'Modo Cabeçalho ativo: o sistema insere o nome do escritório, OAB e rodapé automaticamente.'}
           </span>
           <div className="flex items-center gap-2">
             <button

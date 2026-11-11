@@ -11,10 +11,7 @@ import {
   BarChart3, 
   Settings,
   Scale,
-  LogOut,
-  Link as LinkIcon,
-  Search,
-  Shield
+  LogOut
 } from 'lucide-react';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { clsx } from 'clsx';
@@ -30,13 +27,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Clientes', href: '/clientes', icon: Users },
     { name: 'Processos', href: '/processos', icon: Scale },
-    { name: 'Consulta OAB', href: '/consulta-oab', icon: Search },
     { name: 'Tarefas', href: '/tarefas', icon: CheckSquare },
     { name: 'Documentos', href: '/documentos', icon: File },
     { name: 'Financeiro', href: '/financeiro', icon: DollarSign },
     { name: 'Publicações', href: '/publicacoes', icon: BookOpen },
     { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },
-    { name: 'Integrações', href: '/integracoes', icon: LinkIcon },
   ];
 
   const adminNavigation = [
@@ -120,13 +115,13 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
         )}
       </nav>
 
-      {/* Informações do Usuário e Logout */}
+      {/* Informações do Utilizador e Logout */}
       <div className="p-3 border-t border-slate-800/80 bg-slate-900/40">
         {!collapsed && (
           <div className="mb-2.5 px-2 py-1.5 rounded-md bg-slate-900/60 border border-slate-800/60">
             <p className="text-xs font-semibold text-slate-200 truncate">{user?.name || 'Operador'}</p>
             <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-              <span className="capitalize text-slate-400">{user?.role || 'Usuário'}</span>
+              <span className="capitalize text-slate-400">{user?.role || 'Advogado'}</span>
               {user?.oab && <span className="font-mono text-slate-400">| OAB: {user.oab}</span>}
             </div>
           </div>

@@ -1,9 +1,10 @@
 // src/components/Processes/ProcessDetailsModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
-  X, Scale, User, Building2, Calendar, FileText, 
+  X, Scale, User, Building2, FileText, 
   Clock, DollarSign, Bell, Download, Eye, 
-  CheckCircle2, Copy, Check, Sparkles, Edit, Save, Loader2
+  Copy, Check, Sparkles, Trash2, Printer, Save, Loader2,
+  Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
@@ -27,9 +28,9 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
   const [cnjCopiado, setCnjCopiado] = useState(false);
   const [modalGerarDocAberto, setModalGerarDocAberto] = useState(false);
   
-  // Estado para Visualizar / Editar documento já salvo na Pasta Digital
+  // Estado para Visualizar / Editar documento da Pasta Digital no formato timbrado
   const [viewingDoc, setViewingDoc] = useState<any | null>(null);
-  const [editDocText, setEditDocText] = useState<string>('');
+  const editorModalRef = useRef<HTMLDivElement>(null);
 
   const queryClient = useQueryClient();
   const { success, error: notifyError } = useNotifications();
@@ -90,15 +91,19 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
     }
   });
 
-  // Salvar edições feitas em um documento já gravado
+  // Mutation: Salvar edições feitas no documento existente
   const updateDocMutation = useMutation({
     mutationFn: async () => {
-      if (!viewingDoc) return;
+      if (!viewingDoc || !editorModalRef.current) return;
+      const updatedHtml = editorModalRef.current.innerHTML;
+      const updatedText = editorModalRef.current.innerText;
+
       const { error } = await supabase
         .from('documents')
         .update({
-          content: editDocText,
-          description: editDocText.substring(0, 300),
+          content: updatedText,
+          html_content: updatedHtml,
+          description: updatedText.substring(0, 300),
           updated_at: new Date().toISOString()
         })
         .eq('id', viewingDoc.id);
@@ -107,15 +112,92 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['process-documents', process.id] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
-      success('Atualizado', 'Alterações salvas no documento.');
+      success('Atualizado', 'As alterações foram salvas com sucesso.');
       setViewingDoc(null);
     },
     onError: (err: any) => notifyError('Erro ao atualizar', err.message)
   });
 
+  // Mutation: Excluir documento da Pasta Digital
+  const deleteDocMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', docId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['process-documents', process.id] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      success('Excluído', 'Documento removido da Pasta Digital.');
+    },
+    onError: (err: any) => notifyError('Erro ao excluir', err.message)
+  });
+
   const handleAbrirDoc = (doc: any) => {
     setViewingDoc(doc);
-    setEditDocText(doc.content || doc.description || '');
+    setTimeout(() => {
+      if (editorModalRef.current) {
+        // Se houver html_content salvo, preserva formatação completa e alinhamento
+        if (doc.html_content) {
+          editorModalRef.current.innerHTML = doc.html_content;
+        } else {
+          // Fallback para conteúdo em texto simples convertido em parágrafos
+          const text = doc.content || doc.description || '';
+          editorModalRef.current.innerHTML = text
+            .split('\n')
+            .map((linha: string) => `<p style="text-align: justify; margin: 0 0 0.8em 0;">${linha.trim() || '<br>'}</p>`)
+            .join('');
+        }
+      }
+    }, 50);
+  };
+
+  const handlePrintViewingDoc = () => {
+    const win = window.open('', '', 'width=850,height=950');
+    if (!win || !editorModalRef.current) return;
+    const bodyHtml = editorModalRef.current.innerHTML;
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${viewingDoc?.name || 'Documento Judicial'}</title>
+          <style>
+            @page { size: A4 portrait; margin: 25mm 20mm 20mm 25mm; }
+            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #0f172a; margin: 0; padding: 0; }
+            .print-header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 24px; }
+            .print-footer { border-top: 1px solid #cbd5e1; padding-top: 8px; margin-top: 32px; font-size: 8pt; color: #64748b; text-align: center; }
+            p { margin: 0 0 0.8em 0; }
+          </style>
+        </head>
+        <body>
+          <div class="print-header">
+            <div>
+              <h1 style="font-size: 12pt; font-weight: bold; margin: 0;">SILVA ADVOCACIA & CONSULTORIA JURÍDICA</h1>
+              <p style="font-size: 9pt; color: #475569; margin: 2px 0 0 0;">OAB/BA nº 12.345</p>
+            </div>
+            <div style="font-size: 8pt; font-family: monospace; color: #64748b; text-align: right;">
+              Autos nº ${process.number}
+            </div>
+          </div>
+          <div>${bodyHtml}</div>
+          <div class="print-footer">
+            <p>Av. Tancredo Neves, Salvador/BA • Tel: (71) 3333-4444</p>
+          </div>
+          <script>
+            window.onload = function() { window.print(); window.close(); };
+          </script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
+  const formatSelection = (command: string, value: string | undefined = undefined) => {
+    editorModalRef.current?.focus();
+    document.execCommand(command, false, value);
   };
 
   const handleCopiarCnj = () => {
@@ -299,11 +381,23 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <button 
                           onClick={() => handleAbrirDoc(doc)}
-                          className="px-2 py-1 text-slate-700 hover:bg-slate-200/70 border border-slate-200 rounded flex items-center gap-1 text-[11px] font-medium"
-                          title="Visualizar e Editar Texto"
+                          className="px-2.5 py-1 text-slate-700 hover:bg-slate-100 border border-slate-200 rounded flex items-center gap-1 text-[11px] font-medium shadow-2xs"
+                          title="Visualizar e Editar Minuta no Timbrado"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
                           <span>Abrir / Editar</span>
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`Deseja excluir o documento "${doc.name || doc.title}"?`)) {
+                              deleteDocMutation.mutate(doc.id);
+                            }
+                          }}
+                          disabled={deleteDocMutation.isPending}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                          title="Excluir documento"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -360,55 +454,183 @@ export const ProcessDetailsModal: React.FC<ProcessDetailsModalProps> = ({
 
       </div>
 
-      {/* MODAL DE LEITURA E EDIÇÃO DO DOCUMENTO JÁ GRAVADO */}
+      {/* MODAL FORENSE: VISUALIZADOR E EDITOR DE DOCUMENTO SALVO (EM PAPEL TIMBRADO) */}
       {viewingDoc && (
-        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-2xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden text-xs">
-            <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-2xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl h-[92vh] flex flex-col overflow-hidden text-xs">
+            {/* Topo do Visualizador */}
+            <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-indigo-600" />
-                <h3 className="font-bold text-slate-900 text-sm truncate max-w-md">{viewingDoc.name || viewingDoc.title}</h3>
+                <h3 className="font-bold text-slate-900 text-sm truncate max-w-md">
+                  {viewingDoc.name || viewingDoc.title}
+                </h3>
               </div>
-              <button onClick={() => setViewingDoc(null)} className="p-1 text-slate-400 hover:text-slate-700">
-                <X className="w-4 h-4" />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrintViewingDoc}
+                  className="px-2.5 py-1 text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 flex items-center gap-1.5 shadow-2xs font-medium"
+                >
+                  <Printer className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Imprimir A4</span>
+                </button>
+                <button 
+                  onClick={() => setViewingDoc(null)} 
+                  className="p-1 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Barra de Formatação */}
+            <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2 shrink-0">
+              <div className="flex items-center gap-1 bg-white p-1 rounded-md border border-slate-300 shadow-2xs">
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); formatSelection('bold'); }}
+                  className="p-1 rounded text-slate-700 hover:bg-slate-100"
+                  title="Negrito"
+                >
+                  <Bold className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); formatSelection('italic'); }}
+                  className="p-1 rounded text-slate-700 hover:bg-slate-100"
+                  title="Itálico"
+                >
+                  <Italic className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); formatSelection('underline'); }}
+                  className="p-1 rounded text-slate-700 hover:bg-slate-100"
+                  title="Sublinhado"
+                >
+                  <Underline className="h-3.5 w-3.5" />
+                </button>
+                <div className="w-px h-4 bg-slate-200 mx-1" />
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); formatSelection('justifyLeft'); }}
+                  className="p-1 rounded text-slate-700 hover:bg-slate-100"
+                  title="Alinhar à Esquerda"
+                >
+                  <AlignLeft className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); formatSelection('justifyCenter'); }}
+                  className="p-1 rounded text-slate-700 hover:bg-slate-100"
+                  title="Centralizar"
+                >
+                  <AlignCenter className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); formatSelection('justifyRight'); }}
+                  className="p-1 rounded text-slate-700 hover:bg-slate-100"
+                  title="Alinhar à Direita"
+                >
+                  <AlignRight className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); formatSelection('justifyFull'); }}
+                  className="p-1 rounded text-slate-700 hover:bg-slate-100"
+                  title="Justificar"
+                >
+                  <AlignJustify className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <span className="text-[11px] text-slate-500">
+                O documento pode ser editado diretamente sobre a folha timbrada abaixo.
+              </span>
+            </div>
+
+            {/* Folha A4 com Cabeçalho Timbrado */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-200/70 flex justify-center">
+              <div 
+                className="w-full max-w-[210mm] min-h-[297mm] bg-white border border-slate-300 rounded shadow-md p-8 sm:p-12 flex flex-col justify-between"
+                style={{
+                  fontFamily: 'Times New Roman, serif',
+                  fontSize: '12pt',
+                  lineHeight: '1.5'
+                }}
+              >
+                {/* Cabeçalho */}
+                <div className="border-b-2 border-slate-900 pb-2 mb-6 flex justify-between items-end">
+                  <div>
+                    <h3 className="font-bold text-slate-900 tracking-wide text-sm">
+                      SILVA ADVOCACIA & CONSULTORIA JURÍDICA
+                    </h3>
+                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">OAB/BA nº 12.345</p>
+                  </div>
+                  <div className="text-[9px] font-mono text-slate-400 text-right">
+                    Autos: {process.number}
+                  </div>
+                </div>
+
+                {/* Editor com foco e seleção liberados */}
+                <div
+                  ref={editorModalRef}
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  tabIndex={0}
+                  className="w-full min-h-[500px] flex-1 border-none focus:outline-none bg-transparent text-slate-900 leading-relaxed cursor-text select-text"
+                />
+
+                {/* Rodapé */}
+                <div className="border-t border-slate-200 pt-3 mt-8 text-center text-[9px] text-slate-400 font-mono">
+                  <p>Av. Tancredo Neves, Salvador/BA • Tel: (71) 3333-4444</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Rodapé com Salvar e Excluir */}
+            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Tem certeza de que deseja excluir permanentemente esta peça?')) {
+                    deleteDocMutation.mutate(viewingDoc.id);
+                    setViewingDoc(null);
+                  }
+                }}
+                className="px-3 py-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-md font-medium flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Excluir Arquivo</span>
               </button>
-            </div>
 
-            <div className="p-4 flex-1 overflow-hidden bg-slate-100 flex flex-col">
-              <textarea
-                value={editDocText}
-                onChange={(e) => setEditDocText(e.target.value)}
-                className="w-full flex-1 p-4 bg-white border border-slate-300 rounded-lg font-mono text-xs text-slate-900 leading-relaxed resize-none focus:outline-none shadow-inner overflow-y-auto"
-                placeholder="Conteúdo do documento..."
-              />
-            </div>
-
-            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Edite o texto acima e clique em Salvar Alterações.</span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setViewingDoc(null)}
                   className="px-3.5 py-1.5 border border-slate-300 rounded-md hover:bg-slate-100 text-slate-700"
                 >
-                  Cancelar
+                  Fechar
                 </button>
                 <button
                   type="button"
                   onClick={() => updateDocMutation.mutate()}
                   disabled={updateDocMutation.isPending}
-                  className="px-4 py-1.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 font-medium flex items-center gap-1.5 shadow-2xs"
+                  className="px-4 py-1.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 font-medium shadow-2xs flex items-center gap-1.5"
                 >
                   {updateDocMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                   <span>Salvar Alterações</span>
                 </button>
               </div>
             </div>
+
           </div>
         </div>
       )}
 
-      {/* Modal Gerador */}
+      {/* Modal Gerador de Novos Documentos */}
       {modalGerarDocAberto && (
         <GenerateDocumentModal
           process={process}

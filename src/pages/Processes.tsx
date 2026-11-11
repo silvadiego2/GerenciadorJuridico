@@ -320,11 +320,10 @@ const Processes: React.FC = () => {
                         </div>
                         
                         {Boolean(process.value && Number(process.value) > 0) && (
-                          <div className="flex items-center space-x-1 mt-2">
-                            <DollarSign className="h-3 w-3 text-emerald-700" />
-                            <span className="text-xs font-semibold font-mono text-emerald-800">
-                              R$ {Number(process.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </span>
+                          <div className="mt-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold font-mono bg-emerald-50 text-emerald-800 border border-emerald-200">
+      R$ {Number(process.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+    </span>
                           </div>
                         )}
                       </div>

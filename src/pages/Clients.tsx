@@ -1,37 +1,58 @@
 // src/pages/Clients.tsx
 import React, { useState } from 'react';
-import { Plus, Search, Eye, Edit2, Phone, Mail, Trash2, Loader2, Building, User } from 'lucide-react';
+import { 
+  Plus, Search, Eye, Edit2, Phone, Mail, Trash2, 
+  Loader2, User, MapPin, FileText, X, Scale, Check, Copy 
+} from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '../lib/api';
+import { supabase } from '../lib/supabaseClient';
 import { Client } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import ClientModal from '../components/Clients/ClientModal';
 import { useNotifications } from '../hooks/useNotifications';
 import { useDebounce } from '../hooks/useDebounce';
+import { formatPhone, formatCEP } from '../lib/formatters';
 
 const Clients: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'fisica' | 'juridica'>('all');
-  const [selectedStatus, setSelectedStatus] = useState<'all' | 'ativo' | 'inativo'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [viewingClient, setViewingClient] = useState<Client | null>(null);
+  const [copiedPhone, setCopiedPhone] = useState(false);
   
   const queryClient = useQueryClient();
   const { success, error } = useNotifications();
   const debouncedSearchTerm = useDebounce(searchTerm, 250);
 
   const { data: clientsData, isLoading, error: queryError } = useQuery({
-    queryKey: ['clients', debouncedSearchTerm, selectedType, selectedStatus],
+    queryKey: ['clients', debouncedSearchTerm, selectedType],
     queryFn: () => clientsService.getAll({
       search: debouncedSearchTerm || undefined,
       type: selectedType !== 'all' ? selectedType : undefined,
-      status: selectedStatus !== 'all' ? selectedStatus : undefined,
     }),
     staleTime: 5 * 60 * 1000,
   });
 
   const clients = Array.isArray(clientsData?.clients) ? clientsData.clients : [];
+
+  // Busca processos vinculados ao cliente aberto no "Olho"
+  const { data: clientProcesses = [], isLoading: loadingClientProcesses } = useQuery({
+    queryKey: ['client-processes', viewingClient?.id],
+    queryFn: async () => {
+      if (!viewingClient?.id) return [];
+      const { data, error } = await supabase
+        .from('processes')
+        .select('id, number, subject, title, status, court')
+        .or(`client_id.eq.${viewingClient.id},plaintiff.ilike.%${viewingClient.name}%`)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: Boolean(viewingClient?.id)
+  });
 
   const createClientMutation = useMutation({
     mutationFn: clientsService.create,
@@ -65,6 +86,7 @@ const Clients: React.FC = () => {
   });
 
   const handleEditClient = (client: Client) => {
+    setViewingClient(null);
     setEditingClient(client);
     setIsModalOpen(true);
   };
@@ -81,6 +103,13 @@ const Clients: React.FC = () => {
     } else {
       createClientMutation.mutate(clientData);
     }
+  };
+
+  const handleCopyPhone = (phone?: string) => {
+    if (!phone) return;
+    navigator.clipboard.writeText(formatPhone(phone));
+    setCopiedPhone(true);
+    setTimeout(() => setCopiedPhone(false), 2000);
   };
 
   if (queryError) {
@@ -186,7 +215,11 @@ const Clients: React.FC = () => {
                       </td>
                       <td className="py-2.5 px-3 text-slate-600">
                         {client.email && <p className="truncate max-w-[200px]">{client.email}</p>}
-                        {client.phone && <p className="text-[11px] text-slate-400">{client.phone}</p>}
+                        {client.phone && (
+                          <p className="text-[11px] font-mono text-slate-600">
+                            {formatPhone(client.phone)}
+                          </p>
+                        )}
                         {!client.email && !client.phone && '-'}
                       </td>
                       <td className="py-2.5 px-3 text-slate-600">
@@ -194,6 +227,13 @@ const Clients: React.FC = () => {
                       </td>
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setViewingClient(client)}
+                            className="p-1 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors"
+                            title="Ficha do Cliente"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
                           <button
                             onClick={() => handleEditClient(client)}
                             className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
@@ -237,11 +277,17 @@ const Clients: React.FC = () => {
                   {(client.email || client.phone) && (
                     <div className="text-[11px] text-slate-500 space-y-0.5 bg-slate-50 p-2 rounded">
                       {client.email && <p className="truncate">Email: {client.email}</p>}
-                      {client.phone && <p>Tel: {client.phone}</p>}
+                      {client.phone && <p className="font-mono">Tel: {formatPhone(client.phone)}</p>}
                     </div>
                   )}
 
                   <div className="flex justify-end gap-1 pt-1">
+                    <button
+                      onClick={() => setViewingClient(client)}
+                      className="px-2.5 py-1 text-xs border border-slate-200 rounded text-slate-700 hover:bg-slate-50 flex items-center gap-1"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> Ficha
+                    </button>
                     <button
                       onClick={() => handleEditClient(client)}
                       className="px-2.5 py-1 text-xs border border-slate-200 rounded text-slate-600 hover:bg-slate-50 flex items-center gap-1"
@@ -261,6 +307,157 @@ const Clients: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Modal de Visualização ("Olho") do Cliente */}
+      {viewingClient && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-2xl rounded-xl border border-slate-200 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-xs">
+            {/* Topo */}
+            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-start justify-between gap-3 shrink-0">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-slate-900">{viewingClient.name}</h3>
+                    <span className="px-2 py-0.5 text-[10px] font-semibold uppercase rounded-sm border bg-emerald-50 text-emerald-700 border-emerald-200">
+                      {viewingClient.status || 'Ativo'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                    {viewingClient.type === 'juridica' ? 'Pessoa Jurídica' : 'Pessoa Física'}
+                    {viewingClient.document ? ` • ${viewingClient.document}` : ''}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleEditClient(viewingClient)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-md transition shadow-2xs"
+                >
+                  Editar Cadastro
+                </button>
+                <button
+                  onClick={() => setViewingClient(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-md transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Corpo da Ficha */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1 bg-slate-50/40">
+              {/* Contatos Padronizados */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5 mb-1">
+                    <Phone className="w-3.5 h-3.5 text-slate-600" /> Telefone / WhatsApp
+                  </span>
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono font-semibold text-slate-900 text-xs">
+                      {viewingClient.phone ? formatPhone(viewingClient.phone) : 'Não informado'}
+                    </p>
+                    {viewingClient.phone && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPhone(viewingClient.phone)}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded"
+                        title="Copiar telefone"
+                      >
+                        {copiedPhone ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5 mb-1">
+                    <Mail className="w-3.5 h-3.5 text-slate-600" /> E-mail
+                  </span>
+                  <p className="font-medium text-slate-900 truncate">
+                    {viewingClient.email || 'Não informado'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Endereço Completo */}
+              <div className="p-3.5 bg-white border border-slate-200 rounded-lg shadow-2xs space-y-1.5">
+                <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-600" /> Endereço de Qualificação
+                </span>
+                {viewingClient.address && Object.values(viewingClient.address).some(Boolean) ? (
+                  <div className="text-slate-800 leading-relaxed">
+                    <p className="font-medium">
+                      {[
+                        viewingClient.address.street,
+                        viewingClient.address.number && `nº ${viewingClient.address.number}`,
+                        viewingClient.address.complement
+                      ].filter(Boolean).join(', ')}
+                    </p>
+                    <p className="text-slate-600">
+                      {[
+                        viewingClient.address.neighborhood,
+                        viewingClient.address.city && `${viewingClient.address.city}/${viewingClient.address.state || 'BA'}`,
+                        viewingClient.address.zipCode && `CEP: ${formatCEP(viewingClient.address.zipCode)}`
+                      ].filter(Boolean).join(' • ')}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 italic">Endereço ainda não preenchido.</p>
+                )}
+              </div>
+
+              {/* Processos Vinculados */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold uppercase text-slate-500 flex items-center gap-1.5">
+                  <Scale className="w-3.5 h-3.5 text-slate-700" /> Processos Vinculados ({clientProcesses.length})
+                </span>
+                {loadingClientProcesses ? (
+                  <div className="p-4 text-center text-slate-400 bg-white border border-slate-200 rounded-lg">
+                    Buscando processos...
+                  </div>
+                ) : clientProcesses.length === 0 ? (
+                  <div className="p-4 text-center text-slate-400 bg-white border border-slate-200 rounded-lg">
+                    Nenhum processo vinculado a este cliente.
+                  </div>
+                ) : (
+                  <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
+                    {clientProcesses.map((proc: any) => (
+                      <div key={proc.id} className="p-3 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-mono font-bold text-slate-900">{proc.number}</p>
+                          <p className="text-[11px] text-slate-500 truncate">{proc.subject || proc.title}</p>
+                        </div>
+                        <span className="text-[10px] font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200 shrink-0">
+                          {proc.court || 'TJ-BA'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Rodapé */}
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <span className="text-[10px] text-slate-400 font-mono">
+                Cadastrado em: {viewingClient.createdAt || (viewingClient as any).created_at
+                  ? format(new Date(viewingClient.createdAt || (viewingClient as any).created_at), "dd/MM/yyyy", { locale: ptBR })
+                  : '-'}
+              </span>
+              <button
+                onClick={() => setViewingClient(null)}
+                className="px-4 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-md transition shadow-2xs"
+              >
+                Fechar Ficha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <ClientModal

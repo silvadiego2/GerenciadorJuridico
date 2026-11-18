@@ -1,16 +1,21 @@
 // src/components/Clients/ClientModal.tsx
-import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Phone, FileText, MapPin, Building } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, User, Mail, Phone, FileText, Search, Loader2 } from 'lucide-react';
 import { Client } from '../../types';
+import { formatPhone, formatCEP, formatDocument, fetchAddressByCEP } from '../../lib/formatters';
+import { useAuthContext } from '../../contexts/AuthContext';
 
 interface ClientModalProps {
   client: Client | null;
-  onSave: (clientData: Partial<Client>) => void;
+  onSave: (clientData: Partial<Client> & { user_id?: string }) => void;
   onClose: () => void;
   isLoading: boolean;
 }
 
 const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLoading }) => {
+  const { user } = useAuthContext();
+  const numberInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -30,14 +35,16 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
+  const [cepFeedback, setCepFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     if (client) {
       setFormData({
         name: client.name || '',
         email: client.email || '',
-        phone: client.phone || '',
-        document: client.document || '',
+        phone: formatPhone(client.phone),
+        document: client.document ? formatDocument(client.document, client.type || 'fisica') : '',
         type: client.type || 'fisica',
         status: (client.status as any) || 'ativo',
         address: {
@@ -47,7 +54,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
           neighborhood: client.address?.neighborhood || '',
           city: client.address?.city || '',
           state: client.address?.state || 'BA',
-          zipCode: client.address?.zipCode || '',
+          zipCode: formatCEP(client.address?.zipCode),
         },
       });
     } else {
@@ -69,7 +76,38 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
         },
       });
     }
+    setCepFeedback(null);
+    setErrors({});
   }, [client]);
+
+  const consultarViaCep = async (cepValue: string) => {
+    const digits = cepValue.replace(/\D/g, '');
+    if (digits.length !== 8) return;
+
+    setIsSearchingCep(true);
+    setCepFeedback(null);
+
+    const resultado = await fetchAddressByCEP(digits);
+    setIsSearchingCep(false);
+
+    if (resultado) {
+      setFormData(prev => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          zipCode: formatCEP(digits),
+          street: resultado.street || prev.address.street,
+          neighborhood: resultado.neighborhood || prev.address.neighborhood,
+          city: resultado.city || prev.address.city,
+          state: resultado.state || prev.address.state,
+        }
+      }));
+      setCepFeedback('Endereço preenchido via ViaCEP');
+      setTimeout(() => numberInputRef.current?.focus(), 80);
+    } else {
+      setCepFeedback('CEP não localizado');
+    }
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -91,6 +129,13 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
       }
     }
 
+    if (formData.phone) {
+      const cleanPhone = formData.phone.replace(/\D/g, '');
+      if (cleanPhone.length > 0 && cleanPhone.length < 10) {
+        newErrors.phone = 'Telefone deve conter DDD + 8 ou 9 dígitos';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -99,18 +144,46 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
     e.preventDefault();
     
     if (validateForm()) {
-      const clientData = {
+      const hasAddress = Object.entries(formData.address).some(
+        ([key, value]) => key !== 'state' && value && value.trim() !== ''
+      );
+
+      const clientData: Partial<Client> & { user_id?: string } = {
         ...formData,
-        address: Object.values(formData.address).some(value => value && value.trim()) 
-          ? formData.address 
+        phone: formatPhone(formData.phone),
+        address: hasAddress
+          ? {
+              ...formData.address,
+              zipCode: formatCEP(formData.address.zipCode),
+              state: formData.address.state.toUpperCase()
+            }
           : undefined,
       };
+
+      // Vincula o perfil autenticado na criação
+      if (!client && user?.id) {
+        clientData.user_id = user.id;
+      }
+
       onSave(clientData);
     }
   };
 
   const handleChange = (field: string, value: string) => {
-    if (field.startsWith('address.')) {
+    if (field === 'phone') {
+      setFormData(prev => ({ ...prev, phone: formatPhone(value) }));
+    } else if (field === 'address.zipCode') {
+      const formattedCep = formatCEP(value);
+      setFormData(prev => ({
+        ...prev,
+        address: { ...prev.address, zipCode: formattedCep }
+      }));
+      if (formattedCep.replace(/\D/g, '').length === 8) {
+        consultarViaCep(formattedCep);
+      } else {
+        setCepFeedback(null);
+      }
+    } else if (field.startsWith('address.')) {
       const addressField = field.split('.')[1];
       setFormData(prev => ({
         ...prev,
@@ -122,28 +195,6 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
     
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
-
-  const formatDocument = (value: string, type: 'fisica' | 'juridica') => {
-    const cleaned = value.replace(/\D/g, '');
-    if (type === 'fisica') {
-      return cleaned.slice(0, 11).replace(/(\d{3})(\d{3})?(\d{3})?(\d{2})?/, (_, p1, p2, p3, p4) => {
-        let res = p1;
-        if (p2) res += `.${p2}`;
-        if (p3) res += `.${p3}`;
-        if (p4) res += `-${p4}`;
-        return res;
-      });
-    } else {
-      return cleaned.slice(0, 14).replace(/(\d{2})(\d{3})?(\d{3})?(\d{4})?(\d{2})?/, (_, p1, p2, p3, p4, p5) => {
-        let res = p1;
-        if (p2) res += `.${p2}`;
-        if (p3) res += `.${p3}`;
-        if (p4) res += `/${p4}`;
-        if (p5) res += `-${p5}`;
-        return res;
-      });
     }
   };
 
@@ -280,31 +331,55 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
-                    className="pl-9 pr-3 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+                    className={`pl-9 pr-3 py-1.5 w-full border rounded-md font-mono text-xs focus:outline-hidden focus:border-slate-400 ${
+                      errors.phone ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 focus:bg-white'
+                    }`}
                     placeholder="(71) 99999-9999"
+                    maxLength={15}
                   />
                 </div>
+                {errors.phone && <p className="text-rose-600 text-[11px] mt-0.5">{errors.phone}</p>}
               </div>
             </div>
           </div>
 
-          {/* Endereço */}
+          {/* Endereço com Busca Automática ViaCEP */}
           <div className="space-y-3 pt-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pb-1 border-b border-slate-100">
-              Endereço & Comarca
-            </span>
+            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Endereço & Comarca
+              </span>
+              {cepFeedback && (
+                <span className={`text-[10px] font-medium ${cepFeedback.includes('ViaCEP') ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {cepFeedback}
+                </span>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-slate-700 font-medium mb-1">
-                  CEP
+                  CEP (Busca Automática)
                 </label>
-                <input
-                  type="text"
-                  value={formData.address.zipCode}
-                  onChange={(e) => handleChange('address.zipCode', e.target.value)}
-                  className="px-3 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
-                  placeholder="00000-000"
-                />
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={formData.address.zipCode}
+                    onChange={(e) => handleChange('address.zipCode', e.target.value)}
+                    className="pl-3 pr-8 py-1.5 w-full border border-slate-200 rounded-md font-mono text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-400"
+                    placeholder="40000-000"
+                    maxLength={9}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => consultarViaCep(formData.address.zipCode)}
+                    disabled={isSearchingCep || formData.address.zipCode.replace(/\D/g, '').length !== 8}
+                    className="absolute right-2 text-slate-400 hover:text-slate-700 disabled:opacity-40"
+                    title="Pesquisar CEP"
+                  >
+                    {isSearchingCep ? <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-700" /> : <Search className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -365,6 +440,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onSave, onClose, isLo
                   Número
                 </label>
                 <input
+                  ref={numberInputRef}
                   type="text"
                   value={formData.address.number}
                   onChange={(e) => handleChange('address.number', e.target.value)}
